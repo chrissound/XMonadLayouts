@@ -1,6 +1,7 @@
 # MiddleColumn (4k / Large monitor friendly)
 
 ![MiddleColumn Example](https://pbs.twimg.com/media/C86b-RDXUAEqfbr.jpg:large)
+![MiddleColumn Example 2](http://i.imgur.com/FyHpotk.jpg)
 Having a large monitor means each time I'd open a new window in XMonad, it' go to the topleft. Not ideal.
 
 This creates a single main window with two side columns. The two side columns have the windows vertically stacked.
