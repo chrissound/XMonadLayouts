@@ -1,16 +1,18 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+
 module MiddleColumn where
 
 import           Control.Monad
 import           XMonad
 import qualified XMonad.StackSet as W
 
+-- Example: MiddleColumn 0.25 1 0.040 0.25
 data MiddleColumn a = MiddleColumn {
-  splitRatio        :: Float,
-  middleColumnCount :: Int,
+  splitRatio        :: Float, -- width ratio of side columns
+  middleColumnCount :: Int, -- number of windows in middle column
   deltaIncrement    :: Float,
-  middleColumnSpecialTwoRatio :: Float
+  middleColumnSpecialTwoRatio :: Float -- ratio of window height when two windows are in the middle column
   } deriving (Show, Read)
 
 instance LayoutClass MiddleColumn a where
@@ -19,7 +21,8 @@ instance LayoutClass MiddleColumn a where
     (middleRec:leftRec:rightRec:[]) = mainSplit sr screenRec
     ws = W.integrate s
     middleRecs = if (mcc == 2)
-      then (if (mctRatio >= 0.5) then reverse else id) . (\(y,x) -> [y,x]) $ splitVerticallyBy mctRatio middleRec
+      -- If there are two windows in the "middle column", make the larger window the master
+      then (if (mctRatio >= 0.5) then id else reverse) . (\(m1,m2) -> [m1,m2]) $ splitVerticallyBy mctRatio middleRec
       else splitVertically mcc middleRec
     recs wl | wl <= 3    = middleRecs ++ [leftRec, rightRec]
             | otherwise  = middleRecs ++ (splitVertically lLength leftRec) ++ reverse (splitVertically rLength rightRec) where
