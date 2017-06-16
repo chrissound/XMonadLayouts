@@ -1,6 +1,6 @@
 # MiddleColumn (4k / Large monitor friendly)
 
-[![Video demo](http://img.youtube.com/vi/gScoAp2BBQ/0.jpg)](http://www.youtube.com/watch?v=gScoAp2BBQ "Video demo") 
+[![Video demo](http://img.youtube.com/vi/5gScoAp2BBQ/0.jpg)](http://www.youtube.com/watch?v=5gScoAp2BBQ "Video demo") 
 
 ![MiddleColumn Example](https://pbs.twimg.com/media/C86b-RDXUAEqfbr.jpg:large)
 ![MiddleColumn Example 2](http://i.imgur.com/FyHpotk.jpg)
