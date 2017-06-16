@@ -1,5 +1,7 @@
 # MiddleColumn (4k / Large monitor friendly)
 
+[![Video demo](http://img.youtube.com/vi/gScoAp2BBQ/0.jpg)](http://www.youtube.com/watch?v=gScoAp2BBQ "Video demo") 
+
 ![MiddleColumn Example](https://pbs.twimg.com/media/C86b-RDXUAEqfbr.jpg:large)
 ![MiddleColumn Example 2](http://i.imgur.com/FyHpotk.jpg)
 Having a large monitor means each time I'd open a new window in XMonad, it' go to the topleft. Not ideal.
