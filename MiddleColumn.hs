@@ -6,12 +6,21 @@ module MiddleColumn where
 import           Control.Monad
 import           XMonad
 import qualified XMonad.StackSet as W
+import FocusWindow
 
 data ModifySideContainer = IncrementLeftColumnContainer | IncrementRightColumnContainer | ResetColumnContainer deriving Typeable
 instance Message ModifySideContainer
 
+data FocusSideColumnWindow n = FocusLeft n | FocusRight n deriving Typeable
+instance Message (FocusSideColumnWindow Int)
+
+data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving Typeable
+instance Message (SwopSideColumnWindow Int)
+
 getMiddleColumnSaneDefault :: Int -> Float -> MiddleColumn a
 getMiddleColumnSaneDefault mColumnCount mTwoRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio 0 0
+
+data MiddleColumnEnum = LColumn | MColumn | RColumn
 
 -- Example: MiddleColumn 0.25 1 0.040 0.25
 data MiddleColumn a = MiddleColumn {
@@ -31,7 +40,7 @@ splitVerticallyFixed c r = splitVertically c r
 
 getRecsWithSideContainment :: Rectangle -> Rectangle -> Int -> Int ->  Int -> ([Rectangle], [Rectangle])
 -- Show window on left if it's the only window
-getRecsWithSideContainment lRec rRec 0 0 1 = ([lRec], []) 
+getRecsWithSideContainment lRec _ 0 0 1 = ([lRec], [])
 -- divide equally between left and right
 getRecsWithSideContainment lRec rRec 0 0 totalCount =
   ( splitVerticallyFixed lCount lRec
@@ -75,11 +84,6 @@ instance LayoutClass MiddleColumn a where
       else splitVertically mcc middleRec
     recs wl = middleRecs ++ leftInnerRecs ++ rightInnerRecs where
       (leftInnerRecs, rightInnerRecs) = getRecsWithSideContainment leftRec rightRec lContainerCount rContainerCount ((wl) - mcc)
-    -- recs wl | wl <= 3    = middleRecs ++ [leftRec, rightRec]
-    --         | otherwise  = middleRecs ++ (splitVertically lLength leftRec) ++ reverse (splitVertically rLength rightRec) where
-    --             (lLength, rLength) = splitDiscrete (wl - mcc)
-    --             splitDiscrete a = (b, a - b) where
-    --               b = (quot a 2)
   pureMessage l@(MiddleColumn sRatio mcc _ _ leftCount rightCount) m = msum [
     fmap resize     (fromMessage m),
     fmap incmastern (fromMessage m),
@@ -95,6 +99,26 @@ instance LayoutClass MiddleColumn a where
       resize Expand = l {splitRatio = (min 0.5 $ sRatio + 0.04)}
       resize Shrink = l {splitRatio = (max 0 $ sRatio - 0.04)}
       incmastern (IncMasterN x) = l { middleColumnCount = max 0 (mcc+x) }
+  handleMessage l m = do
+    let leftWindowOffset = (middleColumnCount l - 1)
+    -- Not sure how to avoid this nested case.
+    case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
+      (Just (FocusLeft n)) -> do
+        windows $ focusWindow $ n + leftWindowOffset
+        return Nothing
+      (Just (FocusRight n)) -> do
+        windows $ focusWindow $ negate $ n + leftWindowOffset
+        return Nothing
+      Nothing ->
+        case (fromMessage m :: Maybe (SwopSideColumnWindow Int)) of
+        (Just (SwopLeft n)) -> do
+          swopWindowToMaster $ n + leftWindowOffset
+          return Nothing
+        (Just (SwopRight n)) -> do
+          windows $ focusWindow (negate n)
+          swopWindowToMaster $ negate n
+          return Nothing
+        Nothing -> return $ pureMessage l m
 
 mainSplit :: Float -> Rectangle -> [Rectangle]
 mainSplit f (Rectangle sx sy sw sh) = [m, l, r]
