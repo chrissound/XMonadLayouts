@@ -17,8 +17,8 @@ instance Message (FocusSideColumnWindow Int)
 data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving Typeable
 instance Message (SwopSideColumnWindow Int)
 
-getMiddleColumnSaneDefault :: Int -> Float -> MiddleColumn a
-getMiddleColumnSaneDefault mColumnCount mTwoRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio 0 0
+getMiddleColumnSaneDefault :: Int -> Float -> (Float,Float) -> MiddleColumn a
+getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio mThreeRatio 0 0
 
 data MiddleColumnEnum = LColumn | MColumn | RColumn
 
@@ -28,6 +28,7 @@ data MiddleColumn a = MiddleColumn {
   middleColumnCount :: Int, -- number of windows in middle column
   deltaIncrement    :: Float,
   middleTwoRatio    :: Float, -- ratio of window height when two windows are in the middle column,
+  middleThreeRatio    :: (Float,Float), -- ratio of window height when two windows are in the middle column,
   leftContainerCount :: Int,
   rightContainerCount :: Int
   } deriving (Show, Read)
@@ -58,9 +59,13 @@ getRecsWithSideContainment lRec rRec leftMax rightMax totalCount = (\(i, j) -> (
        , splitVerticallyFixed rightMax rRec
        )
 
+
 instance LayoutClass MiddleColumn a where
   description _ = "MiddleColumn"
-  doLayout l@(MiddleColumn _ mcc _ _ lContainerCount rContainerCount) r s   = do
+  doLayout l r s   = do
+    let mcc = middleColumnCount l
+    let lContainerCount = leftContainerCount l
+    let rContainerCount = rightContainerCount l
     let sideColumnWindowCount = (length $ W.integrate s) - mcc
     let l'  = if (lContainerCount > 0)
           then l {
@@ -75,7 +80,12 @@ instance LayoutClass MiddleColumn a where
           else
             l
     return (pureLayout l' r s, Just l')
-  pureLayout (MiddleColumn sRatio mcc _ mctRatio lContainerCount rContainerCount) screenRec s = zip ws (recs $ length ws) where
+  pureLayout l screenRec s = zip ws (recs $ length ws) where
+    mcc = middleColumnCount l
+    mctRatio = middleTwoRatio l
+    sRatio = splitRatio l
+    lContainerCount = leftContainerCount l
+    rContainerCount = rightContainerCount l
     (middleRec:leftRec:rightRec:[]) = mainSplit sRatio screenRec
     ws = W.integrate s
     middleRecs = if (mcc == 2)
@@ -84,12 +94,16 @@ instance LayoutClass MiddleColumn a where
       else splitVertically mcc middleRec
     recs wl = middleRecs ++ leftInnerRecs ++ rightInnerRecs where
       (leftInnerRecs, rightInnerRecs) = getRecsWithSideContainment leftRec rightRec lContainerCount rContainerCount ((wl) - mcc)
-  pureMessage l@(MiddleColumn sRatio mcc _ _ leftCount rightCount) m = msum [
+  pureMessage l m = msum [
     fmap resize     (fromMessage m),
     fmap incmastern (fromMessage m),
     fmap incSideContainer (fromMessage m)
     ]
     where
+      sRatio = splitRatio l
+      mcc = middleColumnCount l
+      leftCount = leftContainerCount l
+      rightCount = rightContainerCount l
       incSideContainer IncrementLeftColumnContainer = l
         { leftContainerCount = leftCount + 1, rightContainerCount = rightCount - 1}
       incSideContainer IncrementRightColumnContainer = l
