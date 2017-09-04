@@ -1,4 +1,4 @@
-# MiddleColumn (4k / Large monitor friendly)
+# XMonad Middle Column Layout (4k / Large monitor friendly)
 
 ## Functionality:
 - Main rectangle that is centered.
