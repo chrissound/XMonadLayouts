@@ -17,7 +17,7 @@ instance Message (FocusSideColumnWindow Int)
 data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving Typeable
 instance Message (SwopSideColumnWindow Int)
 
-getMiddleColumnSaneDefault :: Int -> Float -> (Float,Float) -> MiddleColumn a
+getMiddleColumnSaneDefault :: Int -> Float -> (Float,Float,Float) -> MiddleColumn a
 getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio mThreeRatio 0 0
 
 data MiddleColumnEnum = LColumn | MColumn | RColumn
@@ -28,7 +28,7 @@ data MiddleColumn a = MiddleColumn {
   middleColumnCount :: Int, -- number of windows in middle column
   deltaIncrement    :: Float,
   middleTwoRatio    :: Float, -- ratio of window height when two windows are in the middle column,
-  middleThreeRatio    :: (Float,Float), -- ratio of window height when two windows are in the middle column,
+  middleThreeRatio    :: (Float,Float,Float), -- ratio of window height when two windows are in the middle column,
   leftContainerCount :: Int,
   rightContainerCount :: Int
   } deriving (Show, Read)
@@ -38,6 +38,22 @@ data MiddleColumn a = MiddleColumn {
 splitVerticallyFixed :: Int -> Rectangle -> [Rectangle]
 splitVerticallyFixed 0 _ = []
 splitVerticallyFixed c r = splitVertically c r
+
+xAccumulateRecatangle :: [Rectangle] -> [Rectangle]
+xAccumulateRecatangle ([]) = []
+xAccumulateRecatangle (r1:[]) = [r1]
+xAccumulateRecatangle (r1:r2:[]) = r1 : [r2 {rect_x = floor $ (fromIntegral $ rect_x r1) + (fromIntegral $ rect_width r1 :: Float)}]
+xAccumulateRecatangle (r1:r2:r3) = do
+  let [ar1, ar2] = xAccumulateRecatangle (r1 : [r2])
+  ar1 : (xAccumulateRecatangle $ ar2 : r3)
+
+splitHorizontallyByRatios :: [Float] -> Rectangle -> [Rectangle]
+splitHorizontallyByRatios ratios mainR@(Rectangle _ _ w _) = do
+  let widthSet = fmap (\ratio -> mainR { rect_width = floor $ fromIntegral w * ratio}) ratios
+  xAccumulateRecatangle widthSet where
+
+splitVerticallyByRatios :: [Float] -> Rectangle -> [Rectangle]
+splitVerticallyByRatios f = fmap mirrorRect . splitHorizontallyByRatios f . mirrorRect
 
 getRecsWithSideContainment :: Rectangle -> Rectangle -> Int -> Int ->  Int -> ([Rectangle], [Rectangle])
 -- Show window on left if it's the only window
@@ -83,6 +99,7 @@ instance LayoutClass MiddleColumn a where
   pureLayout l screenRec s = zip ws (recs $ length ws) where
     mcc = middleColumnCount l
     mctRatio = middleTwoRatio l
+    mc3Ratio = middleThreeRatio l
     sRatio = splitRatio l
     lContainerCount = leftContainerCount l
     rContainerCount = rightContainerCount l
@@ -91,6 +108,7 @@ instance LayoutClass MiddleColumn a where
     middleRecs = if (mcc == 2)
       -- If there are two windows in the "middle column", make the larger window the master
       then (if (mctRatio >= 0.5) then id else reverse) . (\(m1,m2) -> [m1,m2]) $ splitVerticallyBy mctRatio middleRec
+      else if (mcc == 3) then splitVerticallyByRatios ((\(m1,m2,m3) -> [m1,m2,m3]) mc3Ratio) middleRec
       else splitVertically mcc middleRec
     recs wl = middleRecs ++ leftInnerRecs ++ rightInnerRecs where
       (leftInnerRecs, rightInnerRecs) = getRecsWithSideContainment leftRec rightRec lContainerCount rContainerCount ((wl) - mcc)
