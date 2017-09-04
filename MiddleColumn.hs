@@ -7,6 +7,8 @@ import           Control.Monad
 import           XMonad
 import qualified XMonad.StackSet as W
 import FocusWindow
+import Data.List (sortBy)
+import Data.Function (on)
 
 data ModifySideContainer = IncrementLeftColumnContainer | IncrementRightColumnContainer | ResetColumnContainer deriving Typeable
 instance Message ModifySideContainer
@@ -105,11 +107,14 @@ instance LayoutClass MiddleColumn a where
     rContainerCount = rightContainerCount l
     (middleRec:leftRec:rightRec:[]) = mainSplit sRatio screenRec
     ws = W.integrate s
-    middleRecs = if (mcc == 2)
+    middleRecs = 
       -- If there are two windows in the "middle column", make the larger window the master
-      then (if (mctRatio >= 0.5) then id else reverse) . (\(m1,m2) -> [m1,m2]) $ splitVerticallyBy mctRatio middleRec
-      else if (mcc == 3) then splitVerticallyByRatios ((\(m1,m2,m3) -> [m1,m2,m3]) mc3Ratio) middleRec
-      else splitVertically mcc middleRec
+      if (mcc == 2) then
+        reverse . sortBy (compare `on` rect_height) $ (\(m1,m2) -> [m1,m2]) $ splitVerticallyBy mctRatio middleRec
+      else if (mcc == 3) then
+        reverse . sortBy (compare `on` rect_height) $ splitVerticallyByRatios ((\(m1,m2,m3) -> [m1,m2,m3]) mc3Ratio) middleRec
+      else
+        splitVertically mcc middleRec
     recs wl = middleRecs ++ leftInnerRecs ++ rightInnerRecs where
       (leftInnerRecs, rightInnerRecs) = getRecsWithSideContainment leftRec rightRec lContainerCount rContainerCount ((wl) - mcc)
   pureMessage l m = msum [
