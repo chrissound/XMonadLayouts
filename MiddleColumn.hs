@@ -13,6 +13,9 @@ import Data.Function (on)
 data ModifySideContainer = IncrementLeftColumnContainer | IncrementRightColumnContainer | ResetColumnContainer deriving Typeable
 instance Message ModifySideContainer
 
+data ModifySideContainerWidth = IncrementLeftColumnContainerWidth | IncrementRightColumnContainerWidth | ResetColumnContainerWidth deriving Typeable
+instance Message ModifySideContainerWidth
+
 data FocusSideColumnWindow n = FocusLeft n | FocusRight n deriving Typeable
 instance Message (FocusSideColumnWindow Int)
 
@@ -20,7 +23,7 @@ data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving Typeable
 instance Message (SwopSideColumnWindow Int)
 
 getMiddleColumnSaneDefault :: Int -> Float -> (Float,Float,Float) -> MiddleColumn a
-getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio mThreeRatio 0 0
+getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio mThreeRatio Nothing Nothing 0 0
 
 data MiddleColumnEnum = LColumn | MColumn | RColumn
 
@@ -31,6 +34,8 @@ data MiddleColumn a = MiddleColumn {
   deltaIncrement    :: Float,
   middleTwoRatio    :: Float, -- ratio of window height when two windows are in the middle column,
   middleThreeRatio    :: (Float,Float,Float), -- ratio of window height when two windows are in the middle column,
+  leftContainerWidth :: Maybe (Float),
+  rightContainerWidth :: Maybe (Float),
   leftContainerCount :: Int,
   rightContainerCount :: Int
   } deriving (Show, Read)
@@ -102,10 +107,9 @@ instance LayoutClass MiddleColumn a where
     mcc = middleColumnCount l
     mctRatio = middleTwoRatio l
     mc3Ratio = middleThreeRatio l
-    sRatio = splitRatio l
     lContainerCount = leftContainerCount l
     rContainerCount = rightContainerCount l
-    (middleRec:leftRec:rightRec:[]) = mainSplit sRatio screenRec
+    (middleRec:leftRec:rightRec:[]) = mainSplit l screenRec
     ws = W.integrate s
     middleRecs = 
       -- If there are two windows in the "middle column", make the larger window the master
@@ -120,19 +124,29 @@ instance LayoutClass MiddleColumn a where
   pureMessage l m = msum [
     fmap resize     (fromMessage m),
     fmap incmastern (fromMessage m),
-    fmap incSideContainer (fromMessage m)
+    fmap incSideContainer (fromMessage m),
+    fmap incSideContainerWidth (fromMessage m)
     ]
     where
+      widthInc = 0.02
       sRatio = splitRatio l
       mcc = middleColumnCount l
       leftCount = leftContainerCount l
       rightCount = rightContainerCount l
+      -- count
       incSideContainer IncrementLeftColumnContainer = l
         { leftContainerCount = leftCount + 1, rightContainerCount = rightCount - 1}
       incSideContainer IncrementRightColumnContainer = l
         { leftContainerCount = leftCount - 1, rightContainerCount = rightCount + 1}
       incSideContainer ResetColumnContainer = l
         { leftContainerCount = 0, rightContainerCount = 0}
+      -- width
+      incSideContainerWidth IncrementLeftColumnContainerWidth = l
+        { leftContainerWidth = Just $ maybe (splitRatio l) (+ widthInc) (leftContainerWidth l) }
+      incSideContainerWidth IncrementRightColumnContainerWidth = l
+        { rightContainerWidth = Just $ maybe (splitRatio l) (+ widthInc) (rightContainerWidth l) }
+      incSideContainerWidth ResetColumnContainerWidth = l
+        { leftContainerWidth = Nothing, rightContainerWidth = Nothing}
       resize Expand = l {splitRatio = (min 0.5 $ sRatio + 0.04)}
       resize Shrink = l {splitRatio = (max 0 $ sRatio - 0.04)}
       incmastern (IncMasterN x) = l { middleColumnCount = max 0 (mcc+x) }
@@ -157,10 +171,12 @@ instance LayoutClass MiddleColumn a where
           return Nothing
         Nothing -> return $ pureMessage l m
 
-mainSplit :: Float -> Rectangle -> [Rectangle]
-mainSplit f (Rectangle sx sy sw sh) = [m, l, r]
+mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
+mainSplit z (Rectangle sx sy sw sh) = [m, l, r]
   where
-    splitW = floor $ fromIntegral sw * f
-    l = Rectangle sx sy splitW sh
-    m = Rectangle (sx + fromIntegral splitW) sy (sw - (2 * fromIntegral splitW)) sh
-    r = Rectangle ((fromIntegral sw) - (fromIntegral splitW)) sy splitW sh
+    f = splitRatio z
+    splitWLeft = floor $ fromIntegral sw * (maybe f id (leftContainerWidth z))
+    splitWRight = floor $ fromIntegral sw * (maybe f id (rightContainerWidth z))
+    l = Rectangle sx sy splitWLeft sh
+    m = Rectangle (sx + fromIntegral splitWLeft) sy (sw - (splitWLeft) - (splitWRight)) sh
+    r = Rectangle ((fromIntegral sw) - (fromIntegral splitWRight)) sy splitWRight sh
