@@ -9,11 +9,12 @@ import qualified XMonad.StackSet as W
 import FocusWindow
 import Data.List (sortBy)
 import Data.Function (on)
+import Text.Read
 
 data ModifySideContainer = IncrementLeftColumnContainer | IncrementRightColumnContainer | ResetColumnContainer deriving Typeable
 instance Message ModifySideContainer
 
-data ModifySideContainerWidth = IncrementLeftColumnContainerWidth | IncrementRightColumnContainerWidth | ResetColumnContainerWidth deriving Typeable
+data ModifySideContainerWidth = IncrementLeftColumnContainerWidth | IncrementRightColumnContainerWidth | DecrementLeftColumnContainerWidth | DecrementRightColumnContainerWidth | ResetColumnContainerWidth deriving Typeable
 instance Message ModifySideContainerWidth
 
 data FocusSideColumnWindow n = FocusLeft n | FocusRight n deriving Typeable
@@ -22,8 +23,27 @@ instance Message (FocusSideColumnWindow Int)
 data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving Typeable
 instance Message (SwopSideColumnWindow Int)
 
+data SwopSideColumn = SwopLeftColumn | SwopRightColumn | ResetColumn deriving (Show, Typeable)
+instance Message (SwopSideColumn)
+
+instance Read SwopSideColumn where
+  readPrec     = return (ResetColumn)
+  readListPrec = readListPrecDefault
+
 getMiddleColumnSaneDefault :: Int -> Float -> (Float,Float,Float) -> MiddleColumn a
-getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn 0.25 mColumnCount 0.04 mTwoRatio mThreeRatio Nothing Nothing 0 0
+getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn {
+    splitRatio = 0.25
+  , middleColumnCount = mColumnCount
+  , deltaIncrement = 0.04
+  , middleTwoRatio = mTwoRatio
+  , middleThreeRatio = mThreeRatio
+  , leftContainerWidth = Nothing
+  , rightContainerWidth = Nothing
+  , leftContainerCount = 0
+  , rightContainerCount = 0
+  , columnSwop = ResetColumn
+  }
+  
 
 data MiddleColumnEnum = LColumn | MColumn | RColumn
 
@@ -37,7 +57,8 @@ data MiddleColumn a = MiddleColumn {
   leftContainerWidth :: Maybe (Float),
   rightContainerWidth :: Maybe (Float),
   leftContainerCount :: Int,
-  rightContainerCount :: Int
+  rightContainerCount :: Int,
+  columnSwop :: SwopSideColumn
   } deriving (Show, Read)
 
 
@@ -82,6 +103,12 @@ getRecsWithSideContainment lRec rRec leftMax rightMax totalCount = (\(i, j) -> (
        , splitVerticallyFixed rightMax rRec
        )
 
+columnSwops :: MiddleColumn a -> [Rectangle] -> [Rectangle]
+columnSwops l (middleRec:leftRec:rightRec:[]) = case (columnSwop l) of
+  ResetColumn -> [middleRec,leftRec,rightRec]
+  SwopLeftColumn -> [leftRec,middleRec, rightRec]
+  SwopRightColumn -> [rightRec,leftRec,middleRec]
+columnSwops _ r = r
 
 instance LayoutClass MiddleColumn a where
   description _ = "MiddleColumn"
@@ -125,7 +152,8 @@ instance LayoutClass MiddleColumn a where
     fmap resize     (fromMessage m),
     fmap incmastern (fromMessage m),
     fmap incSideContainer (fromMessage m),
-    fmap incSideContainerWidth (fromMessage m)
+    fmap incSideContainerWidth (fromMessage m),
+    fmap columnSwopAbc (fromMessage m)
     ]
     where
       widthInc = 0.02
@@ -145,8 +173,14 @@ instance LayoutClass MiddleColumn a where
         { leftContainerWidth = Just $ maybe (splitRatio l) (+ widthInc) (leftContainerWidth l) }
       incSideContainerWidth IncrementRightColumnContainerWidth = l
         { rightContainerWidth = Just $ maybe (splitRatio l) (+ widthInc) (rightContainerWidth l) }
+      incSideContainerWidth DecrementLeftColumnContainerWidth = l
+        { leftContainerWidth = Just $ maybe (splitRatio l) (flip (-) widthInc) (leftContainerWidth l) }
+      incSideContainerWidth DecrementRightColumnContainerWidth = l
+        { rightContainerWidth = Just $ maybe (splitRatio l) (flip (-) widthInc) (rightContainerWidth l) }
       incSideContainerWidth ResetColumnContainerWidth = l
         { leftContainerWidth = Nothing, rightContainerWidth = Nothing}
+      -- column swops
+      columnSwopAbc cs = l { columnSwop = cs}
       resize Expand = l {splitRatio = (min 0.5 $ sRatio + 0.04)}
       resize Shrink = l {splitRatio = (max 0 $ sRatio - 0.04)}
       incmastern (IncMasterN x) = l { middleColumnCount = max 0 (mcc+x) }
@@ -172,11 +206,12 @@ instance LayoutClass MiddleColumn a where
         Nothing -> return $ pureMessage l m
 
 mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
-mainSplit z (Rectangle sx sy sw sh) = [m, l, r]
+mainSplit z (Rectangle sx sy sw sh) = columnSwops z [m, l, r]
   where
     f = splitRatio z
     splitWLeft = floor $ fromIntegral sw * (maybe f id (leftContainerWidth z))
     splitWRight = floor $ fromIntegral sw * (maybe f id (rightContainerWidth z))
+    splitWMiddle = sw - (splitWLeft) - (splitWRight)
     l = Rectangle sx sy splitWLeft sh
-    m = Rectangle (sx + fromIntegral splitWLeft) sy (sw - (splitWLeft) - (splitWRight)) sh
+    m = Rectangle (sx + fromIntegral splitWLeft) sy (splitWMiddle) sh
     r = Rectangle ((fromIntegral sw) - (fromIntegral splitWRight)) sy splitWRight sh
