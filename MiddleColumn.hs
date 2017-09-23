@@ -10,6 +10,10 @@ import FocusWindow
 import Data.List (sortBy)
 import Data.Function (on)
 import Text.Read
+import Debug.Trace
+
+traceTraceShowId :: Show a => String -> a -> a
+traceTraceShowId x = traceShow x . traceShowId
 
 data ModifySideContainer = IncrementLeftColumnContainer | IncrementRightColumnContainer | ResetColumnContainer deriving Typeable
 instance Message ModifySideContainer
@@ -185,14 +189,14 @@ instance LayoutClass MiddleColumn a where
       resize Shrink = l {splitRatio = (max 0 $ sRatio - 0.04)}
       incmastern (IncMasterN x) = l { middleColumnCount = max 0 (mcc+x) }
   handleMessage l m = do
-    let leftWindowOffset = (middleColumnCount l - 1)
+    let leftWindowOffset = traceTraceShowId "leftWindowOffset:" $ (middleColumnCount l - 1)
     -- Not sure how to avoid this nested case.
     case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
       (Just (FocusLeft n)) -> do
-        windows $ focusWindow $ n + leftWindowOffset
+        windows $ focusWindow $ (traceTraceShowId "FocusLeft:" n) + leftWindowOffset
         return Nothing
       (Just (FocusRight n)) -> do
-        windows $ focusWindow $ negate $ n + leftWindowOffset
+        windows $ focusWindow $ negate $ (traceTraceShowId "FocusRight:" n)
         return Nothing
       Nothing ->
         case (fromMessage m :: Maybe (SwopSideColumnWindow Int)) of
