@@ -7,6 +7,7 @@ import           Control.Monad
 import           XMonad
 import qualified XMonad.StackSet as W
 import FocusWindow
+
 import Data.List (sortBy)
 import Data.Function (on)
 import Text.Read
@@ -121,18 +122,14 @@ instance LayoutClass MiddleColumn a where
     let lContainerCount = leftContainerCount l
     let rContainerCount = rightContainerCount l
     let sideColumnWindowCount = (length $ W.integrate s) - mcc
-    let l'  = if (lContainerCount > 0)
-          then l {
-            leftContainerCount = min sideColumnWindowCount lContainerCount
-            , rightContainerCount = - (min sideColumnWindowCount lContainerCount)
-            }
+    let l'  = if (lContainerCount > 0) then
+            l { leftContainerCount = lcc , rightContainerCount = - (lcc) }
           else if (rContainerCount > 0) then
-            l {
-            leftContainerCount = - (min sideColumnWindowCount rContainerCount)
-            , rightContainerCount = min sideColumnWindowCount rContainerCount
-            }
-          else
-            l
+            l { leftContainerCount = - (rcc) , rightContainerCount = rcc }
+          else l
+            where
+              lcc = min sideColumnWindowCount lContainerCount
+              rcc = min sideColumnWindowCount rContainerCount
     return (pureLayout l' r s, Just l')
   pureLayout l screenRec s = zip ws (recs $ length ws) where
     mcc = middleColumnCount l

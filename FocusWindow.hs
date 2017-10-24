@@ -16,6 +16,18 @@ focusWindow n x = if (nFetch <= (windowLength))
           then n
           else getLast (negate n) [0..(windowLength -1)]
 
+
+swopElementsAt :: Int -> Int -> [a] -> [a]
+swopElementsAt i j xs = (take i xs) ++ [xs !! j] ++ middle ++ [xs !! i] ++ right where
+                        middle = take (j - i - 1) (drop (i + 1) xs)
+                        right = drop (j + 1) xs
+
+swopWindow ::(Eq s, Eq a, Eq i) => Int -> Int -> W.StackSet i l a s sd -> W.StackSet i l a s sd
+swopWindow i i' s | i == i' = s
+                  | i > i' = swopWindow i' i s
+                  | otherwise = s { W.visible = swopElementsAt i i' $ W.visible s}
+
+
 swopWindowToMaster :: Int -> X ()
 swopWindowToMaster n = do
   windows $ focusWindow n
