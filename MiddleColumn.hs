@@ -6,12 +6,16 @@ module MiddleColumn where
 import           Control.Monad
 import           XMonad
 import qualified XMonad.StackSet as W
-import FocusWindow
+import XMonad.StackSet (modify')
+import FocusWindow hiding (traceTraceShowId)
 
 import Data.List (sortBy)
 import Data.Function (on)
 import Text.Read
 import Debug.Trace
+--import qualified WindowColumn
+import WindowColumn (SwopSideColumnWindow(..))
+import WindowColumn (SwopTo(SwopTo))
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -24,9 +28,6 @@ instance Message ModifySideContainerWidth
 
 data FocusSideColumnWindow n = FocusLeft n | FocusRight n deriving Typeable
 instance Message (FocusSideColumnWindow Int)
-
-data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving Typeable
-instance Message (SwopSideColumnWindow Int)
 
 data SwopSideColumn = SwopLeftColumn | SwopRightColumn | ResetColumn deriving (Show, Typeable)
 instance Message (SwopSideColumn)
@@ -204,7 +205,12 @@ instance LayoutClass MiddleColumn a where
           windows $ focusWindow (negate n)
           swopWindowToMaster $ negate n
           return Nothing
-        Nothing -> return $ pureMessage l m
+        Nothing -> case (fromMessage m :: Maybe (SwopTo)) of
+                   (Just (SwopTo f t _)) -> do
+                     let modifier = swopStackElements f t
+                     windows $ modify' modifier
+                     return $ Just l
+                   Nothing -> return $ pureMessage l m
 
 mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
 mainSplit z (Rectangle sx sy sw sh) = columnSwops z [m, l, r]
