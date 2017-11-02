@@ -14,8 +14,7 @@ import Data.Function (on)
 import Text.Read
 import Debug.Trace
 --import qualified WindowColumn
-import WindowColumn (SwopSideColumnWindow(..))
-import WindowColumn (SwopTo(SwopTo))
+import WindowColumn (SwopSideColumnWindow(..), SwopTo(SwopTo), Column(Left, Right, Middle))
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -206,8 +205,14 @@ instance LayoutClass MiddleColumn a where
           swopWindowToMaster $ negate n
           return Nothing
         Nothing -> case (fromMessage m :: Maybe (SwopTo)) of
-                   (Just (SwopTo f t _)) -> do
-                     let modifier = swopStackElements f t
+                   (Just (SwopTo f t c)) -> do
+                     ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
+                     let ws' = maybe 0 (length . W.integrate) ws
+                     let f' =  case c of
+                                 WindowColumn.Left -> f + leftWindowOffset
+                                 WindowColumn.Right -> getLastNthWindowIndex f (traceTraceShowId "ws" ws')
+                                 WindowColumn.Middle -> f
+                     let modifier = swopStackElements f' t
                      windows $ modify' modifier
                      return $ Just l
                    Nothing -> return $ pureMessage l m
