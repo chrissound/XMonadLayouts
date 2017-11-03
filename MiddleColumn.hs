@@ -186,6 +186,8 @@ instance LayoutClass MiddleColumn a where
       resize Shrink = l {splitRatio = (max 0 $ sRatio - 0.04)}
       incmastern (IncMasterN x) = l { middleColumnCount = max 0 (mcc+x) }
   handleMessage l m = do
+    ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
+    let windowCount = (traceTraceShowId "WindowCount:" $ maybe 0 (length . W.integrate) ws)
     let leftWindowOffset = traceTraceShowId "leftWindowOffset:" $ (middleColumnCount l - 1)
     -- Not sure how to avoid this nested case.
     case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
@@ -193,7 +195,7 @@ instance LayoutClass MiddleColumn a where
         windows $ focusWindow $ (traceTraceShowId "FocusLeft:" n) + leftWindowOffset
         return Nothing
       (Just (FocusRight n)) -> do
-        windows $ focusWindow $ negate $ (traceTraceShowId "FocusRight:" n)
+        windows $ focusWindow $ getLastNthWindowIndex (traceTraceShowId "FocusRight:" n) windowCount
         return Nothing
       Nothing ->
         case (fromMessage m :: Maybe (SwopSideColumnWindow Int)) of
@@ -201,16 +203,13 @@ instance LayoutClass MiddleColumn a where
           swopWindowToMaster $ n + leftWindowOffset
           return Nothing
         (Just (SwopRight n)) -> do
-          windows $ focusWindow (negate n)
-          swopWindowToMaster $ negate n
+          swopWindowToMaster $ (getLastNthWindowIndex n windowCount)
           return Nothing
         Nothing -> case (fromMessage m :: Maybe (SwopTo)) of
                    (Just (SwopTo f t c)) -> do
-                     ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
-                     let ws' = maybe 0 (length . W.integrate) ws
                      let f' =  case c of
                                  WindowColumn.Left -> f + leftWindowOffset
-                                 WindowColumn.Right -> getLastNthWindowIndex f (traceTraceShowId "ws" ws')
+                                 WindowColumn.Right -> getLastNthWindowIndex f windowCount
                                  WindowColumn.Middle -> f
                      let modifier = swopStackElements f' t
                      windows $ modify' modifier
