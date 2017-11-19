@@ -44,8 +44,8 @@ getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn {
   , middleThreeRatio = mThreeRatio
   , leftContainerWidth = Nothing
   , rightContainerWidth = Nothing
-  , leftContainerCount = 0
-  , rightContainerCount = 0
+  , leftContainerCount = 2
+  , rightContainerCount = -2
   , columnSwop = ResetColumn
   }
   
