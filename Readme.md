@@ -2,28 +2,28 @@
 
 ## Installation
 
-  cd ~/.xmonad
-  mkdir -p lib
-  cd lib
-  git clone https://github.com/chrissound/XMonadLayouts .
+    cd ~/.xmonad
+    mkdir -p lib
+    cd lib
+    git clone https://github.com/chrissound/XMonadLayouts .
 
 This above will add the modules to be acccessible to your xmonad.hs
 
 You then need to add the follow imports:
 
-  import           MiddleColumn
-  import WindowColumn
-  import WindowColumn as Column (Column(..))
-  import XMonad.Actions.Submap
+    import           MiddleColumn
+    import WindowColumn
+    import WindowColumn as Column (Column(..))
+    import XMonad.Actions.Submap
 
 This helper function:
 
-  defaultThreeColumn :: (Float, Float, Float)
-  defaultThreeColumn = (0.15, 0.65, 0.2)
+    defaultThreeColumn :: (Float, Float, Float)
+    defaultThreeColumn = (0.15, 0.65, 0.2)
 
 Add the layout to your config (by adding it within `layoutHook`), for example:
 
-  layoutHook = desktopLayoutModifiers $ getMiddleColumnSaneDefault 2 0.15 defaultThreeColumn)
+    layoutHook = desktopLayoutModifiers $ getMiddleColumnSaneDefault 2 0.15 defaultThreeColumn)
 
 Now you just need to set the keybindings. I'm using a dvorak layout keyboard so these perhaps could be set to something else if using qwerty:
 
