@@ -79,7 +79,7 @@ Now you just need to set the keybindings. I'm using a dvorak layout keyboard so 
 - Set the left or right column width individually. 
 
 ## Demo
-[![Video demo](http://img.youtube.com/vi/5gScoAp2BBQ/0.jpg)](http://www.youtube.com/watch?v=5gScoAp2BBQ "Video demo") 
+[![Video demo](http://img.youtube.com/vi/e5GTCpzL3OY/0.jpg)](https://youtu.be/e5GTCpzL3OY "Video demo") 
 
 ## Example Screenshots
 ![MiddleColumn Example](http://i.imgur.com/OrmshtY.jpg)
