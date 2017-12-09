@@ -15,6 +15,7 @@ import Text.Read
 import Debug.Trace
 --import qualified WindowColumn
 import WindowColumn (SwopSideColumnWindow(..), SwopTo(SwopTo), Column(Left, Right, Middle))
+import Data.Foldable
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -48,7 +49,6 @@ getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn {
   , rightContainerCount = -2
   , columnSwop = ResetColumn
   }
-  
 
 data MiddleColumnEnum = LColumn | MColumn | RColumn
 
@@ -189,33 +189,38 @@ instance LayoutClass MiddleColumn a where
     ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
     let windowCount = (traceTraceShowId "WindowCount:" $ maybe 0 (length . W.integrate) ws)
     let leftWindowOffset = traceTraceShowId "leftWindowOffset:" $ (middleColumnCount l - 1)
-    -- Not sure how to avoid this nested case.
-    case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
-      (Just (FocusLeft n)) -> do
-        windows $ focusWindow $ (traceTraceShowId "FocusLeft:" n) + leftWindowOffset
-        return Nothing
-      (Just (FocusRight n)) -> do
-        windows $ focusWindow $ getLastNthWindowIndex (traceTraceShowId "FocusRight:" n) windowCount
-        return Nothing
-      Nothing ->
-        case (fromMessage m :: Maybe (SwopSideColumnWindow Int)) of
-        (Just (SwopLeft n)) -> do
-          swopWindowToMaster $ n + leftWindowOffset
-          return Nothing
-        (Just (SwopRight n)) -> do
-          swopWindowToMaster $ (getLastNthWindowIndex n windowCount)
-          return Nothing
-        Nothing -> case (fromMessage m :: Maybe (SwopTo)) of
-                   (Just (SwopTo f t c)) -> do
-                     let f' =  case c of
-                                 WindowColumn.Left -> f + leftWindowOffset
-                                 WindowColumn.Right -> getLastNthWindowIndex f windowCount
-                                 WindowColumn.Middle -> f
-                     let modifier = swopStackElements f' t
-                     windows $ modify' modifier
-                     return $ Just l
-                   Nothing -> return $ pureMessage l m
-
+    let possibleMessages= [
+          case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
+            (Just (FocusLeft n)) -> return $ do
+              windows $ focusWindow $ (traceTraceShowId "FocusLeft:" n) + leftWindowOffset
+              return Nothing
+            (Just (FocusRight n)) -> return $ do
+              windows $ focusWindow $ getLastNthWindowIndex (traceTraceShowId "FocusRight:" n) windowCount
+              return Nothing
+            _ -> do
+              Nothing
+          , case (fromMessage m :: Maybe (SwopSideColumnWindow Int)) of
+            (Just (SwopLeft n)) -> return $ do
+              swopWindowToMaster $ n + leftWindowOffset
+              return Nothing
+            (Just (SwopRight n)) -> return $ do
+              swopWindowToMaster $ (getLastNthWindowIndex n windowCount)
+              return Nothing
+            _ -> Nothing
+          , case (fromMessage m :: Maybe (SwopTo)) of
+             (Just (SwopTo f t c)) -> return $ do
+               let f' =  case c of
+                           WindowColumn.Left -> f + leftWindowOffset
+                           WindowColumn.Right -> getLastNthWindowIndex f windowCount
+                           WindowColumn.Middle -> f
+               let modifier = swopStackElements f' t
+               windows $ modify' modifier
+               return $ Just l
+             _ -> Nothing
+          ]
+    case (asum possibleMessages) of
+      Just x -> x
+      _ -> return $ pureMessage l m
 mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
 mainSplit z (Rectangle sx sy sw sh) = columnSwops z [m, l, r]
   where
