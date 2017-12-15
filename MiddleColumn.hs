@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module MiddleColumn where
 
@@ -13,9 +14,9 @@ import Data.List (sortBy)
 import Data.Function (on)
 import Text.Read
 import Debug.Trace
---import qualified WindowColumn
 import WindowColumn (SwopSideColumnWindow(..), SwopTo(SwopTo), Column(Left, Right, Middle))
 import Data.Foldable
+import Control.Lens
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -38,34 +39,35 @@ instance Read SwopSideColumn where
 
 getMiddleColumnSaneDefault :: Int -> Float -> (Float,Float,Float) -> MiddleColumn a
 getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio = MiddleColumn {
-    splitRatio = 0.25
-  , middleColumnCount = mColumnCount
-  , deltaIncrement = 0.04
-  , middleTwoRatio = mTwoRatio
-  , middleThreeRatio = mThreeRatio
-  , leftContainerWidth = Nothing
-  , rightContainerWidth = Nothing
-  , leftContainerCount = 2
-  , rightContainerCount = -2
-  , columnSwop = ResetColumn
+    _splitRatio = 0.25
+  , _middleColumnCount = mColumnCount
+  , _deltaIncrement = 0.04
+  , _middleTwoRatio = mTwoRatio
+  , _middleThreeRatio = mThreeRatio
+  , _leftContainerWidth = Nothing
+  , _rightContainerWidth = Nothing
+  , _leftContainerCount = 2
+  , _rightContainerCount = -2
+  , _columnSwop = ResetColumn
   }
 
 data MiddleColumnEnum = LColumn | MColumn | RColumn
 
 -- Example: MiddleColumn 0.25 1 0.040 0.25
 data MiddleColumn a = MiddleColumn {
-  splitRatio        :: Float, -- width ratio of side columns
-  middleColumnCount :: Int, -- number of windows in middle column
-  deltaIncrement    :: Float,
-  middleTwoRatio    :: Float, -- ratio of window height when two windows are in the middle column,
-  middleThreeRatio    :: (Float,Float,Float), -- ratio of window height when two windows are in the middle column,
-  leftContainerWidth :: Maybe (Float),
-  rightContainerWidth :: Maybe (Float),
-  leftContainerCount :: Int,
-  rightContainerCount :: Int,
-  columnSwop :: SwopSideColumn
+  _splitRatio        :: Float, -- width ratio of side columns
+  _middleColumnCount :: Int, -- number of windows in middle column
+  _deltaIncrement    :: Float,
+  _middleTwoRatio    :: Float, -- ratio of window height when two windows are in the middle column,
+  _middleThreeRatio    :: (Float,Float,Float), -- ratio of window height when two windows are in the middle column,
+  _leftContainerWidth :: Maybe (Float),
+  _rightContainerWidth :: Maybe (Float),
+  _leftContainerCount :: Int,
+  _rightContainerCount :: Int,
+  _columnSwop :: SwopSideColumn
   } deriving (Show, Read)
 
+makeLenses ''MiddleColumn
 
 -- If zero then return no rectangles
 splitVerticallyFixed :: Int -> Rectangle -> [Rectangle]
@@ -109,42 +111,47 @@ getRecsWithSideContainment lRec rRec leftMax rightMax totalCount = (\(i, j) -> (
        )
 
 columnSwops :: MiddleColumn a -> [Rectangle] -> [Rectangle]
-columnSwops l (middleRec:leftRec:rightRec:[]) = case (columnSwop l) of
+columnSwops l (middleRec:leftRec:rightRec:[]) = case (_columnSwop l) of
   ResetColumn -> [middleRec,leftRec,rightRec]
   SwopLeftColumn -> [leftRec,middleRec, rightRec]
   SwopRightColumn -> [rightRec,leftRec,middleRec]
 columnSwops _ r = r
 
+ifNothing :: Maybe a -> a -> Maybe a
+ifNothing (Just x) _ = Just x
+ifNothing (Nothing) v = Just v
+
 instance LayoutClass MiddleColumn a where
   description _ = "MiddleColumn"
   doLayout l r s   = do
-    let mcc = middleColumnCount l
-    let lContainerCount = leftContainerCount l
-    let rContainerCount = rightContainerCount l
+    let mcc = _middleColumnCount l
+    let lContainerCount = _leftContainerCount l
+    let rContainerCount = _rightContainerCount l
     let sideColumnWindowCount = (length $ W.integrate s) - mcc
     let l'  = if (lContainerCount > 0) then
-            l { leftContainerCount = lcc , rightContainerCount = - (lcc) }
+            l { _leftContainerCount = lcc , _rightContainerCount = - (lcc) }
           else if (rContainerCount > 0) then
-            l { leftContainerCount = - (rcc) , rightContainerCount = rcc }
+            l { _leftContainerCount = - (rcc) , _rightContainerCount = rcc }
           else l
             where
               lcc = min sideColumnWindowCount lContainerCount
               rcc = min sideColumnWindowCount rContainerCount
     return (pureLayout l' r s, Just l')
   pureLayout l screenRec s = zip ws (recs $ length ws) where
-    mcc = middleColumnCount l
-    mctRatio = middleTwoRatio l
-    mc3Ratio = middleThreeRatio l
-    lContainerCount = leftContainerCount l
-    rContainerCount = rightContainerCount l
+    mcc = _middleColumnCount l
+    mctRatio = _middleTwoRatio l
+    mc3Ratio = _middleThreeRatio l
+    lContainerCount = _leftContainerCount l
+    rContainerCount = _rightContainerCount l
     (middleRec:leftRec:rightRec:[]) = mainSplit l screenRec
     ws = W.integrate s
+    sortByHeightDesc = reverse . sortBy (compare `on` rect_height)
     middleRecs = 
       -- If there are two windows in the "middle column", make the larger window the master
       if (mcc == 2) then
-        reverse . sortBy (compare `on` rect_height) $ (\(m1,m2) -> [m1,m2]) $ splitVerticallyBy mctRatio middleRec
+         sortByHeightDesc $ (\(m1,m2) -> [m1,m2]) $ splitVerticallyBy mctRatio middleRec
       else if (mcc == 3) then
-        reverse . sortBy (compare `on` rect_height) $ splitVerticallyByRatios ((\(m1,m2,m3) -> [m1,m2,m3]) mc3Ratio) middleRec
+        sortByHeightDesc $ splitVerticallyByRatios ((\(m1,m2,m3) -> [m1,m2,m3]) mc3Ratio) middleRec
       else
         splitVertically mcc middleRec
     recs wl = middleRecs ++ leftInnerRecs ++ rightInnerRecs where
@@ -152,43 +159,22 @@ instance LayoutClass MiddleColumn a where
   pureMessage l m = msum [
     fmap resize     (fromMessage m),
     fmap incmastern (fromMessage m),
-    fmap incSideContainer (fromMessage m),
-    fmap incSideContainerWidth (fromMessage m),
+    fmap (flip incSideContainer l) (fromMessage m),
+    fmap (incSideContainerWidth l) (fromMessage m),
     fmap columnSwopAbc (fromMessage m)
     ]
     where
-      widthInc = 0.02
-      sRatio = splitRatio l
-      mcc = middleColumnCount l
-      leftCount = leftContainerCount l
-      rightCount = rightContainerCount l
-      -- count
-      incSideContainer IncrementLeftColumnContainer = l
-        { leftContainerCount = leftCount + 1, rightContainerCount = rightCount - 1}
-      incSideContainer IncrementRightColumnContainer = l
-        { leftContainerCount = leftCount - 1, rightContainerCount = rightCount + 1}
-      incSideContainer ResetColumnContainer = l
-        { leftContainerCount = 0, rightContainerCount = 0}
-      -- width
-      incSideContainerWidth IncrementLeftColumnContainerWidth = l
-        { leftContainerWidth = Just $ maybe (splitRatio l) (+ widthInc) (leftContainerWidth l) }
-      incSideContainerWidth IncrementRightColumnContainerWidth = l
-        { rightContainerWidth = Just $ maybe (splitRatio l) (+ widthInc) (rightContainerWidth l) }
-      incSideContainerWidth DecrementLeftColumnContainerWidth = l
-        { leftContainerWidth = Just $ maybe (splitRatio l) (flip (-) widthInc) (leftContainerWidth l) }
-      incSideContainerWidth DecrementRightColumnContainerWidth = l
-        { rightContainerWidth = Just $ maybe (splitRatio l) (flip (-) widthInc) (rightContainerWidth l) }
-      incSideContainerWidth ResetColumnContainerWidth = l
-        { leftContainerWidth = Nothing, rightContainerWidth = Nothing}
+      sRatio = _splitRatio l
+      mcc = _middleColumnCount l
       -- column swops
-      columnSwopAbc cs = l { columnSwop = cs}
-      resize Expand = l {splitRatio = (min 0.5 $ sRatio + 0.04)}
-      resize Shrink = l {splitRatio = (max 0 $ sRatio - 0.04)}
-      incmastern (IncMasterN x) = l { middleColumnCount = max 0 (mcc+x) }
+      columnSwopAbc cs = l { _columnSwop = cs}
+      resize Expand = l {_splitRatio = (min 0.5 $ sRatio + 0.04)}
+      resize Shrink = l {_splitRatio = (max 0 $ sRatio - 0.04)}
+      incmastern (IncMasterN x) = l { _middleColumnCount = max 0 (mcc+x) }
   handleMessage l m = do
     ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
     let windowCount = (traceTraceShowId "WindowCount:" $ maybe 0 (length . W.integrate) ws)
-    let leftWindowOffset = traceTraceShowId "leftWindowOffset:" $ (middleColumnCount l - 1)
+    let leftWindowOffset = traceTraceShowId "leftWindowOffset:" $ (_middleColumnCount l - 1)
     let possibleMessages= [
           case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
             (Just (FocusLeft n)) -> return $ do
@@ -221,12 +207,39 @@ instance LayoutClass MiddleColumn a where
     case (asum possibleMessages) of
       Just x -> x
       _ -> return $ pureMessage l m
+
+widthDelta :: Float
+widthDelta = 0.02
+
+widthInc, widthDec :: Float -> Float
+widthInc = (+ widthDelta)
+widthDec = flip (-) widthDelta
+
+incSideContainer :: ModifySideContainer -> MiddleColumn l -> MiddleColumn l
+incSideContainer IncrementLeftColumnContainer =  (leftContainerCount +~ 1) . (rightContainerCount -~ 1)
+incSideContainer IncrementRightColumnContainer = (leftContainerCount -~ 1) . (rightContainerCount +~ 1)
+incSideContainer ResetColumnContainer =          (leftContainerCount .~ 0) . (rightContainerCount .~ 0)
+
+colWidthOver ::
+  (Float -> b)
+  -> ASetter (MiddleColumn a) t (Maybe Float) (Maybe b)
+  -> MiddleColumn a
+  -> t
+colWidthOver f v l = over v (\val -> f <$> ifNothing val (_splitRatio l)) l
+
+incSideContainerWidth :: MiddleColumn l -> ModifySideContainerWidth -> MiddleColumn l
+incSideContainerWidth l IncrementLeftColumnContainerWidth =  colWidthOver widthInc leftContainerWidth l
+incSideContainerWidth l IncrementRightColumnContainerWidth = colWidthOver widthInc rightContainerWidth l
+incSideContainerWidth l DecrementLeftColumnContainerWidth =  colWidthOver widthDec leftContainerWidth l
+incSideContainerWidth l DecrementRightColumnContainerWidth = colWidthOver widthDec rightContainerWidth l
+incSideContainerWidth l ResetColumnContainerWidth = (leftContainerWidth .~ Nothing) . (rightContainerWidth .~ Nothing) $ l
+
 mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
 mainSplit z (Rectangle sx sy sw sh) = columnSwops z [m, l, r]
   where
-    f = splitRatio z
-    splitWLeft = floor $ fromIntegral sw * (maybe f id (leftContainerWidth z))
-    splitWRight = floor $ fromIntegral sw * (maybe f id (rightContainerWidth z))
+    f = _splitRatio z
+    splitWLeft = floor $ fromIntegral sw * (maybe f id (_leftContainerWidth z))
+    splitWRight = floor $ fromIntegral sw * (maybe f id (_rightContainerWidth z))
     splitWMiddle = sw - (splitWLeft) - (splitWRight)
     l = Rectangle sx sy splitWLeft sh
     m = Rectangle (sx + fromIntegral splitWLeft) sy (splitWMiddle) sh
