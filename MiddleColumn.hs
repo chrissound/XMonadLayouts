@@ -21,6 +21,11 @@ import WindowColumn
   ( Column(Left, Middle, Right)
   , SwopSideColumnWindow(..)
   , SwopTo(SwopTo)
+  , wColumn
+  , wIndex
+  , wDirection
+  , WindowDirection (..)
+  , WindowPosition (..)
   )
 
 traceTraceShowId :: Show a => String -> a -> a
@@ -215,6 +220,40 @@ ifNothing :: Maybe a -> a -> Maybe a
 ifNothing (Just x) _ = Just x
 ifNothing (Nothing) v = Just v
 
+layoutRectangles :: MiddleColumn a1 -> Rectangle -> W.Stack a -> [(a, Rectangle)]
+layoutRectangles l screenRec s = zip ws (a++b++c) where
+      ws = W.integrate s
+      (a,b,c) = layoutRectangles' l screenRec $ length ws
+
+layoutRectangles' :: MiddleColumn a1 -> Rectangle -> Int -> ([Rectangle],[Rectangle],[Rectangle])
+layoutRectangles' l screenRec s = recs s
+    where
+      mcc = _middleColumnCount l
+      mctRatio = _middleTwoRatio l
+      mc3Ratio = _middleThreeRatio l
+      (middleRec:leftRec:rightRec:[]) = mainSplit l screenRec
+      sortByHeightDesc = reverse . sortBy (compare `on` rect_height)
+      middleRecs
+       = -- If there are two windows in the "middle column", make the larger window the master
+        if (mcc == 2)
+          then sortByHeightDesc $
+               (\(m1, m2) -> [m1, m2]) $ splitVerticallyBy mctRatio middleRec
+          else if (mcc == 3)
+                 then sortByHeightDesc $
+                      splitVerticallyByRatios
+                        ((\(m1, m2, m3) -> [m1, m2, m3]) mc3Ratio)
+                        middleRec
+                 else splitVertically mcc middleRec
+      recs wl = (middleRecs, leftInnerRecs, rightInnerRecs)
+        where
+          (leftInnerRecs, rightInnerRecs) =
+            getRecsWithSideContainment
+              leftRec
+              rightRec
+              (_leftContainerCount l)
+              (_rightContainerCount l)
+              (wl - mcc)
+
 instance LayoutClass MiddleColumn a where
   description _ = "MiddleColumn"
   doLayout l r s = do
@@ -235,37 +274,7 @@ instance LayoutClass MiddleColumn a where
             lcc = min sideColumnWindowCount lContainerCount
             rcc = min sideColumnWindowCount rContainerCount
     return (pureLayout l' r s, Just l')
-  pureLayout l screenRec s = zip ws (recs $ length ws)
-    where
-      mcc = _middleColumnCount l
-      mctRatio = _middleTwoRatio l
-      mc3Ratio = _middleThreeRatio l
-      lContainerCount = _leftContainerCount l
-      rContainerCount = _rightContainerCount l
-      (middleRec:leftRec:rightRec:[]) = mainSplit l screenRec
-      ws = W.integrate s
-      sortByHeightDesc = reverse . sortBy (compare `on` rect_height)
-      middleRecs
-      -- If there are two windows in the "middle column", make the larger window the master
-       =
-        if (mcc == 2)
-          then sortByHeightDesc $
-               (\(m1, m2) -> [m1, m2]) $ splitVerticallyBy mctRatio middleRec
-          else if (mcc == 3)
-                 then sortByHeightDesc $
-                      splitVerticallyByRatios
-                        ((\(m1, m2, m3) -> [m1, m2, m3]) mc3Ratio)
-                        middleRec
-                 else splitVertically mcc middleRec
-      recs wl = middleRecs ++ leftInnerRecs ++ rightInnerRecs
-        where
-          (leftInnerRecs, rightInnerRecs) =
-            getRecsWithSideContainment
-              leftRec
-              rightRec
-              lContainerCount
-              rContainerCount
-              ((wl) - mcc)
+  pureLayout = layoutRectangles
   pureMessage l m =
     msum
       [ fmap resize (fromMessage m)
@@ -290,6 +299,10 @@ instance LayoutClass MiddleColumn a where
           (traceTraceShowId "WindowCount:" $ maybe 0 (length . W.integrate) ws)
     let leftWindowOffset =
           traceTraceShowId "leftWindowOffset:" $ (_middleColumnCount l - 1)
+    let leftWindowCount =
+          traceTraceShowId "leftWindowCount:" $ (_middleColumnCount l - 1)
+    let rightWindowCount =
+          traceTraceShowId "rightWindowCount:" $ (_middleColumnCount l - 1)
     let possibleMessages =
           [ case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
               (Just (FocusLeft n)) ->
@@ -319,15 +332,12 @@ instance LayoutClass MiddleColumn a where
                   return Nothing
               _ -> Nothing
           , case (fromMessage m :: Maybe (SwopTo)) of
-              (Just (SwopTo f t c)) ->
+              (Just (SwopTo f t)) ->
                 return $ do
-                  let f' =
-                        case c of
-                          WindowColumn.Left -> f + leftWindowOffset
-                          WindowColumn.Right ->
-                            getLastNthWindowIndex f windowCount
-                          WindowColumn.Middle -> f
-                  let modifier = swopStackElements f' t
+                  let (leftWindowCount,rightWindowCount) = (\(_,l,r) -> (length l, length r)) $ layoutRectangles' l (Rectangle 1000 1000 1000 1000) (length ws)
+                  let f' = getWindowIndex f leftWindowOffset leftWindowCount rightWindowCount windowCount
+                  let t' = getWindowIndex t leftWindowOffset leftWindowCount rightWindowCount windowCount
+                  let modifier = swopStackElements f' (wIndex t)
                   windows $ modify' modifier
                   return $ Just l
               _ -> Nothing
@@ -335,6 +345,17 @@ instance LayoutClass MiddleColumn a where
     case (asum possibleMessages) of
       Just x -> x
       _ -> return $ pureMessage l m
+
+getWindowIndex :: WindowColumn.WindowPosition -> Int -> Int -> Int -> Int -> Int
+getWindowIndex w leftWindowOffset leftWindowCount rightWindowCount windowCount =
+  case (wColumn w) of
+    WindowColumn.Left -> case (wDirection w) of
+      Up ->   leftWindowOffset + (wIndex w)
+      Down -> leftWindowOffset - (wIndex w) + leftWindowCount
+    WindowColumn.Right -> case (wDirection w) of
+      Up -> getLastNthWindowIndex (wIndex w) windowCount
+      Down -> getLastNthWindowIndex (wIndex w - (rightWindowCount)) windowCount
+    WindowColumn.Middle -> (wIndex w)
 
 widthDelta :: Float
 widthDelta = 0.02

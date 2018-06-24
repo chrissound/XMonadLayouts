@@ -7,6 +7,7 @@ import Debug.Trace
 import System.IO.Unsafe (unsafePerformIO)
 import XMonad (windows, X, WindowSet, XState(XState, windowset))
 import Control.Monad.State
+import Data.Bool
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -25,9 +26,7 @@ focusWindow n x = if (nFetch <= (windowLength))
           else getLastNthWindowIndex n windowLength
 
 getLastNthWindowIndex :: Int -> Int -> Int
-getLastNthWindowIndex n wl = if n < (wl) then
-                              getLast n [0..wl -1]
-                            else (wl - 1)
+getLastNthWindowIndex n wl = bool (wl - 1) (getLast n [0..wl -1]) (n < (wl))
 
 swopElementsAt :: Int -> Int -> [a] -> [a]
 swopElementsAt f s xs = zipWith (\x y -> 
