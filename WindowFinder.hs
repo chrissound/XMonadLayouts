@@ -5,12 +5,13 @@ import qualified XMonad.StackSet as W
 import Control.Monad
 import Data.Bool  (bool)
 
-findWindows :: String -> X [Window]
-findWindows name = do
+findWindows :: (Display -> Window -> IO a) -> (a -> Bool) -> (X [Window])
+findWindows f ff' = do
   withWindowSet $ (\ws -> do
     forM (W.allWindows ws)
-      (\w -> do
-            s <- withDisplay $ \d -> fmap resClass . liftIO $ getClassHint d w
-            return $ bool [] [w] (s == name) :: X [Window]
+      (\w -> (withDisplay $ \d -> liftIO $ f d w) >>= \s -> return $ bool [] [w] (ff' s) :: X [Window]
       ) >>= return . join
     )
+
+findWindowsByClass :: String -> X [Window]
+findWindowsByClass n = findWindows (\d w -> getClassHint d w >>= return . resClass) ((==) n)
