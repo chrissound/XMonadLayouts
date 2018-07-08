@@ -8,6 +8,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import XMonad (windows, X, WindowSet, XState(XState, windowset))
 import Control.Monad.State
 import Data.Bool
+import FileLogger
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -47,22 +48,7 @@ swopStackElements i j s@(W.Stack _ t b) = do
   let nU = filter ((==) Top . fst) z
   let nB = filter ((==) Bottom . fst) z
   let nF = snd . head $ filter ((==) Focus . fst) z
-  unsafePerformIO $ do 
-    let !_ = traceTraceShowId "New line!" ""
-    let !_ = traceTraceShowId "i" (i)
-    let !_ = traceTraceShowId "j" (j)
-    let !_ = traceTraceShowId "original stack" (zipWith (,) wsp w)
-    let !_ = traceTraceShowId "swopped stack" z
-    let !_ = traceTraceShowId "top length" (length t)
-    let !_ = traceTraceShowId "bottom length" (length b)
-    let !_ = traceTraceShowId "new top length" (length nU)
-    let !_ = traceTraceShowId "new bottom length" (length nB)
-    return $ Stack { focus = nF, up = reverse $ snd <$> nU, down = snd <$> nB }
-
-swopWindow ::(Eq s, Eq a, Eq i) => Int -> Int -> W.StackSet i l a s sd -> W.StackSet i l a s sd
-swopWindow i i' s | i == i' = s
-                  | i > i' = swopWindow i' i s
-                  | otherwise = s { W.visible = swopElementsAt i i' $ W.visible s}
+  Stack { focus = nF, up = reverse $ snd <$> nU, down = snd <$> nB }
 
 swopWindowToMaster :: Int -> X ()
 swopWindowToMaster n = do

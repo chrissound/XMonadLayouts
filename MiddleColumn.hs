@@ -299,10 +299,6 @@ instance LayoutClass MiddleColumn a where
           (traceTraceShowId "WindowCount:" $ maybe 0 (length . W.integrate) ws)
     let leftWindowOffset =
           traceTraceShowId "leftWindowOffset:" $ (_middleColumnCount l - 1)
-    let leftWindowCount =
-          traceTraceShowId "leftWindowCount:" $ (_middleColumnCount l - 1)
-    let rightWindowCount =
-          traceTraceShowId "rightWindowCount:" $ (_middleColumnCount l - 1)
     let possibleMessages =
           [ case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
               (Just (FocusLeft n)) ->
@@ -337,8 +333,7 @@ instance LayoutClass MiddleColumn a where
                   let (leftWindowCount,rightWindowCount) = (\(_,l,r) -> (length l, length r)) $ layoutRectangles' l (Rectangle 1000 1000 1000 1000) (length ws)
                   let f' = getWindowIndex f leftWindowOffset leftWindowCount rightWindowCount windowCount
                   let t' = getWindowIndex t leftWindowOffset leftWindowCount rightWindowCount windowCount
-                  let modifier = swopStackElements f' (wIndex t)
-                  windows $ modify' modifier
+                  windows $ modify' $ swopStackElements f' (t')
                   return $ Just l
               _ -> Nothing
           ]
