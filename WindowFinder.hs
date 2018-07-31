@@ -6,6 +6,11 @@ import Data.List (isPrefixOf)
 import Foreign.C.String
 import XMonad
 import qualified XMonad.StackSet as W
+import XMonad.StackSet
+import Data.List (elemIndex)
+
+windowIndex :: Eq a => a -> StackSet i l a s sd -> Maybe Int
+windowIndex w s = elemIndex w $ allWindowsInCurrentWorkspace s
 
 findWindows ::
      (WindowSet -> [Window])
@@ -51,5 +56,9 @@ findWindowsInCurrentWorkspaceByTitlePrefix n =
     (isPrefixOf n)
 
 allWindowsInCurrentWorkspace :: W.StackSet i l a sid sd -> [a]
-allWindowsInCurrentWorkspace ws =
-  W.integrate' . W.stack . W.workspace . W.current $ ws
+allWindowsInCurrentWorkspace ss =
+  W.integrate' . W.stack . W.workspace . W.current $ ss
+
+allWindowsInWorkspace :: Workspace i l a -> [a]
+allWindowsInWorkspace ws =
+  W.integrate' . W.stack $ ws
