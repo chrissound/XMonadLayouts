@@ -69,9 +69,16 @@ data ModifyLayout =
 
 instance Message (MiddleColumnModify)
 
+data ToggleMasterColumnSplit = ToggleMasterColumnSplit
+instance Message (ToggleMasterColumnSplit)
+
 instance Read SwopSideColumn where
   readPrec = return (ResetColumn)
   readListPrec = readListPrecDefault
+
+masterColumnWindowCount l = _middleColumnCount l + case (_splitMasterWindow l) of
+        Nothing -> 0
+        Just x -> (x - 1)
 
 data MiddleColumnModify = MiddleColumnModify
   { modifySplitRatio :: Float -> Float
@@ -121,6 +128,7 @@ getMiddleColumnSaneDefault ::
 getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio =
   MiddleColumn
   { _splitRatio = (0.25 - 1 * (0.04))
+  , _splitMasterWindow = Nothing
   , _middleColumnCount = mColumnCount
   , _deltaIncrement = 0.04
   , _middleTwoRatio = mTwoRatio
@@ -140,6 +148,7 @@ data MiddleColumnEnum
 -- Example: MiddleColumn 0.25 1 0.040 0.25
 data MiddleColumn a = MiddleColumn
   { _splitRatio :: Float -- width ratio of side columns
+  , _splitMasterWindow :: Maybe (Int)
   , _middleColumnCount :: Int -- number of windows in middle column
   , _deltaIncrement :: Float
   , _middleTwoRatio :: Float -- ratio of window height when two windows are in the middle column,
@@ -189,7 +198,7 @@ splitVerticallyByRatios f =
 
 getRecsWithSideContainment ::
      Rectangle -> Rectangle -> Int -> Int -> Int -> ([Rectangle], [Rectangle])
--- Show window on left if it's the only window
+-- Show window on entire left rec if a single window is needed, and there is no 'pinning'
 getRecsWithSideContainment lRec _ 0 0 1 = ([lRec], [])
 -- divide equally between left and right
 getRecsWithSideContainment lRec rRec 0 0 totalCount =
@@ -228,13 +237,17 @@ layoutRectangles l screenRec s = zip ws (a++b++c) where
 layoutRectangles' :: MiddleColumn a1 -> Rectangle -> Int -> ([Rectangle],[Rectangle],[Rectangle])
 layoutRectangles' l screenRec s = recs s
     where
-      mcc = _middleColumnCount l
+      mcc = (_middleColumnCount l)
       mctRatio = _middleTwoRatio l
       mc3Ratio = _middleThreeRatio l
       (middleRec:leftRec:rightRec:[]) = mainSplit l screenRec
       sortByHeightDesc = reverse . sortBy (compare `on` rect_height)
-      middleRecs
-       = -- If there are two windows in the "middle column", make the larger window the master
+      middleRecs =
+        case _splitMasterWindow l of
+          Nothing -> id
+          Just x -> (\(r:rx) -> (splitHorizontally x r) ++ rx)
+        $
+        -- If there are two windows in the "middle column", make the larger window the master
         if (mcc == 2)
           then sortByHeightDesc $
                (\(m1, m2) -> [m1, m2]) $ splitVerticallyBy mctRatio middleRec
@@ -252,7 +265,7 @@ layoutRectangles' l screenRec s = recs s
               rightRec
               (_leftContainerCount l)
               (_rightContainerCount l)
-              (wl - mcc)
+              (wl - masterColumnWindowCount l)
 
 instance LayoutClass MiddleColumn a where
   description _ = "MiddleColumn"
@@ -335,6 +348,12 @@ instance LayoutClass MiddleColumn a where
                   let t' = getWindowIndex t leftWindowOffset leftWindowCount rightWindowCount windowCount
                   windows $ modify' $ swopStackElements f' (t')
                   return $ Just l
+              _ -> Nothing
+          , case (fromMessage m :: Maybe (ToggleMasterColumnSplit)) of
+              (Just ToggleMasterColumnSplit) -> return $ do
+                case _splitMasterWindow l of
+                  Just x -> return $ Just (l {_splitMasterWindow = Nothing})
+                  Nothing -> return $ Just (l {_splitMasterWindow = Just 2})
               _ -> Nothing
           ]
     case (asum possibleMessages) of
