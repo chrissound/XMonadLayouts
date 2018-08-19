@@ -86,7 +86,7 @@ This helper function:
 
 Add the layout to your config (by adding it within `layoutHook`), for example:
 
-    layoutHook = desktopLayoutModifiers $ getMiddleColumnSaneDefault 2 0.15 defaultThreeColumn)
+    layoutHook = (desktopLayoutModifiers $ getMiddleColumnSaneDefault 2 0.15 defaultThreeColumn)
 
 Now you just need to set the keybindings. I'm using a dvorak layout keyboard so these perhaps could be set to something else, but I've attached my entire xmonad.hs in this repo.
 
