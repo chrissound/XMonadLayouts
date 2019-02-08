@@ -11,7 +11,6 @@ import           XMonad.Actions.Navigation2D
 import           XMonad.Config.Desktop
 import qualified XMonad.StackSet                  as W
 import           MiddleColumn
-import qualified Data.Map.Strict                  as Map
 import           System.Process
 import           XMonad.Actions.CopyWindow
 import           XMonad.Actions.DynamicWorkspaces
@@ -37,7 +36,6 @@ import WindowColumn
 import WindowColumn as Column (Column(..))
 import WindowFinder
 --import MyUtils
---import FileLogger
 import FocusWindow
 import XMonad.Layout.MasterOverlay
 
@@ -96,31 +94,51 @@ main = xmonad $ ewmh $ navigation2D def
     , layoutHook = -- simpleDeco shrinkText (mySDConfig) $
       desktopLayoutModifiers . smartBorders $
       mkToggle ((NOBORDERS ?? FULL ?? EOT)) (
-        spacing 6 (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 2 0.2 defaultThreeColumn) |||
-        spacing 6 (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 2 0.5 defaultThreeColumn) |||
-        spacing 6 (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 3 0.75 (0.27333, 0.45333, 0.27333)) |||
-        spacing 6 (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 3 0.75 (0.33333, 0.33333, 0.33333))
+        spacingRaw True (Border 0 0 0 0) True (Border 8 8 8 8) True (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 2 0.2 defaultThreeColumn) |||
+        spacingRaw True (Border 0 0 0 0) True (Border 8 8 8 8) True (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 2 0.5 defaultThreeColumn) |||
+        spacingRaw True (Border 0 0 0 0) True (Border 8 8 8 8) True (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 3 0.75 (0.27333, 0.45333, 0.27333)) |||
+        spacingRaw True (Border 0 0 0 0) True (Border 8 8 8 8) True (ModifiedLayout (MasterOverlay Nothing) $ getMiddleColumnSaneDefault 3 0.75 (0.33333, 0.33333, 0.33333))
       )
-    , handleEventHook = handleEventHook def <+> fullscreenEventHook
+    , handleEventHook = handleEventHook def <+> fullscreenEventHook <+> myHook
     , manageHook =  myManageHook <+> insertPosition End Newer <+> manageHook desktopConfig
     , logHook = historyHook
+    , startupHook = myStartupHook
     }
 
+myStartupHook :: X ()
+myStartupHook = do
+  XConf { display = dpy, theRoot = rootw } <- ask
+  myKeyCode <- io $ (keysymToKeycode dpy xK_Super_R)
+  io $ grabKey dpy (myKeyCode) anyModifier rootw True grabModeAsync grabModeAsync
+  spawn "~/ScriptsVcs/hideTint2.sh"
+
+myHook :: Event -> X All
+myHook e = do
+  case e of
+    ke@(KeyEvent _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) -> do
+      if ev_keycode ke == 134
+        then if ev_state ke == 0
+          then do
+            spawn "~/ScriptsVcs/showTint2.sh"
+          else do
+            spawn "~/ScriptsVcs/hideTint2.sh"
+        else pure ()
+    _ -> pure ()
+  pure $ All True
+
 myKeys :: XConfig l -> M.Map (KeyMask, KeySym) (X ())
-myKeys conf@XConfig {XMonad.modMask = modm} =
+myKeys _undefined@XConfig {XMonad.modMask = modm} =
   M.fromList $
     zip (zip (repeat (modm)) [xK_1..xK_9]) (map (withNthWorkspace W.greedyView) [0..])
   ++
     zip (zip (repeat (modm .|. shiftMask)) [xK_1..xK_9]) (map (withNthWorkspace W.shift) [0..])
   ++
             [
-              ((modm, xK_BackSpace), kill)
             -- Navigation
-            , ((mod1Mask, xK_j), windowSwap D True >> windows W.focusDown)
+              ((mod1Mask, xK_j), windowSwap D True >> windows W.focusDown)
             , ((mod1Mask, xK_k), windowSwap U True >> windows W.focusUp)
             , ((mod1Mask, xK_m), sendMessage MasterOverLayToggleFocus)
             -- Misc
-            , ((modm, xK_BackSpace), kill)
             -- GridSelecet
             -- Toggle left / right column width 
             , ((modm, xK_semicolon), sendMessage (middleColumnModifyId {
@@ -305,6 +323,7 @@ rearrangeWindows = do
   rearrangeWindows' (swopStackElements 2) (findWindowsInCurrentWorkspaceByTitle "ranger" )
   rearrangeWindows' (swopStackElements 3) (findWindowsInCurrentWorkspaceByTitlePrefix "magit")
 
+specialKeyMappings :: [((KeyMask, KeySym), X ())]
 specialKeyMappings = [
                 (singleKey xK_b, sendMessage ToggleStruts)
               , (singleKey xK_f, sendMessage $ Toggle FULL)
@@ -318,7 +337,10 @@ specialKeyMappings = [
               , (singleKey xK_h, spawn "rofi -normal-window -show fb -modi fb:~/Scripts/rofi/envs/haskell/rofi.sh")
               -- programs
               , (singleKey xK_e, spawn "emacsclient -c")
-              , (singleKey xK_v, spawn "lxterminal -e nvim")
+              , (singleKey xK_v, spawn "gnome-terminal -e 'nvim +star'")
               , (singleKey xK_r, rearrangeWindows)
-              , (singleKey xK_s, sendMessage ToggleMasterColumnSplit)
+              , (singleKey xK_s, do
+                    spawn "bash -c 'echo test > /tmp/xmonad.chris'"
+                    sendMessage ToggleMasterColumnSplit
+                )
               ]
