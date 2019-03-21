@@ -31,11 +31,11 @@ import Data.List (elemIndex)
 import XMonad.Layout.NoBorders
 import XMonad.Layout.LayoutModifier
 
-
 import WindowColumn
 import WindowColumn as Column (Column(..))
 import WindowFinder
 --import MyUtils
+import FileLogger
 import FocusWindow
 import XMonad.Layout.MasterOverlay
 
@@ -125,6 +125,16 @@ myHook e = do
         else pure ()
     _ -> pure ()
   pure $ All True
+
+-- myKeysWorkspace :: KeyMask -> [((KeyMask, KeySym), X ())]
+-- myKeysWorkspace modm =
+--   [
+--     (
+--       (m .|. modm, key)
+--     , screenWorkspace sc >>= flip whenJust (windows . f)
+--     ) | (key, sc) <- zip [xK_w, xK_e, xK_r] [0..]
+--       , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]
+--   ]
 
 myKeys :: XConfig l -> M.Map (KeyMask, KeySym) (X ())
 myKeys _undefined@XConfig {XMonad.modMask = modm} =
@@ -256,8 +266,8 @@ myKeys _undefined@XConfig {XMonad.modMask = modm} =
             , ((modm .|. shiftMask, xK_r), renameWorkspace def)
             , ((modm .|. shiftMask, xK_a), addWorkspacePrompt def)
             -- Workspace navigation
-            --, ((modm, xK_e), prevWS)
-            --, ((modm, xK_u), nextWS)
+            , ((modm .|. shiftMask, xK_e), prevWS)
+            , ((modm .|. shiftMask, xK_u), nextWS)
             , ((modm, xK_e), moveTo Prev NonEmptyWS)
             , ((modm, xK_u), moveTo Next NonEmptyWS)
             -- Misc
@@ -298,14 +308,14 @@ singleKey :: b -> (KeyMask, b)
 singleKey = (,) noModMask
 
 devSessionPrompt :: X ()
-devSessionPrompt = spawn "rofi -normal-window -show fb -modi fb:~/Scripts/rofi/xmonadRofi.sh"
+devSessionPrompt = spawn "rofi -show fb -modi fb:~/Scripts/rofi/xmonadRofi.sh"
 
 showClipboardApp :: X ()
 showClipboardApp = spawn "~/ScriptsVcs/showClipboard.sh"
 
 devWorkspacePrompt :: X ()
 devWorkspacePrompt = do
-  x <- liftIO $ readProcess "rofi" ["-normal-window", "-show fb -modi fb:~/Scripts/rofi/xmonadSpace.sh"] ""
+  x <- liftIO $ readProcess "rofi" ["-show fb -modi fb:~/Scripts/rofi/xmonadSpace.sh"] ""
   renameWorkspaceByName x
 
 rearrangeWindows' :: (Int -> W.Stack Window -> W.Stack Window) -> X [Window] -> X ()
@@ -324,23 +334,39 @@ rearrangeWindows = do
   rearrangeWindows' (swopStackElements 3) (findWindowsInCurrentWorkspaceByTitlePrefix "magit")
 
 specialKeyMappings :: [((KeyMask, KeySym), X ())]
-specialKeyMappings = [
-                (singleKey xK_b, sendMessage ToggleStruts)
-              , (singleKey xK_f, sendMessage $ Toggle FULL)
-              , (singleKey xK_z, devSessionPrompt)
-              --, (singleKey xK_p, updatePointer (0.5, 0.5) (0, 0))
-              , (singleKey xK_c, showClipboardApp)
-              , (singleKey xK_g, goToSelected def)
-              , ((shiftMask, xK_g), bringSelected def)
-              , (singleKey xK_p, spawn "xdotool type \"$(xclip -out)\"")
-              , (singleKey xK_t, spawn "emacsclient -c /home/chris/Projects/OrgModeTest/theGreat/theGreatTodo.org")
-              , (singleKey xK_h, spawn "rofi -normal-window -show fb -modi fb:~/Scripts/rofi/envs/haskell/rofi.sh")
-              -- programs
-              , (singleKey xK_e, spawn "emacsclient -c")
-              , (singleKey xK_v, spawn "gnome-terminal -e 'nvim +star'")
-              , (singleKey xK_r, rearrangeWindows)
-              , (singleKey xK_s, do
-                    spawn "bash -c 'echo test > /tmp/xmonad.chris'"
-                    sendMessage ToggleMasterColumnSplit
-                )
-              ]
+specialKeyMappings =
+  (
+    ((,) <$> (singleKey . fst) <*> snd)
+    <$> [
+          ( xK_a, do
+              sendMessage ToggleStruts
+              ws <- gets windowset
+              logM $ logM' "zzzz" "current2"
+              logM $ show $ W.current ws
+              logM "floating..."
+              logM $ show $ W.floating ws
+          )
+        , ( xK_b, sendMessage ToggleStruts)
+        , ( xK_d, spawn "rofi -show fb -modi fb:~/Scripts/rofi/envs/timelog/rofi.sh")
+        , ( xK_f, sendMessage $ Toggle FULL)
+        , ( xK_z, devSessionPrompt)
+        --, ( xK_p, updatePointer (0.5, 0.5) (0, 0))
+        , ( xK_c, showClipboardApp)
+        , ( xK_g, goToSelected def)
+        , ( xK_p, spawn "xdotool type \"$(xclip -out)\"")
+        , ( xK_t, spawn "emacsclient -c /home/chris/Projects/OrgModeTest/theGreat/theGreatTodo.org")
+        , ( xK_h, spawn "rofi -show fb -modi fb:~/Scripts/rofi/envs/haskell/rofi.sh")
+        -- programs
+        , ( xK_e, spawn "emacsclient -c")
+        , ( xK_v, spawn "gnome-terminal -e 'nvim +star'")
+        , ( xK_r, rearrangeWindows)
+        , ( xK_s, do
+              spawn "bash -c 'echo test > /tmp/xmonad.chris'"
+              sendMessage ToggleMasterColumnSplit
+          )
+        ]
+  )
+  <>
+  [
+              ((shiftMask, xK_g), bringSelected def)
+  ]
