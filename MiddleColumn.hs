@@ -2,8 +2,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS -Wno-orphans #-}
 
-module MiddleColumn where
+module MiddleColumn (
+    module MiddleColumn
+  , module Types
+  , middleColumnModifyId
+                    ) where
 
 import Control.Monad
 import FocusWindow hiding (traceTraceShowId)
@@ -11,12 +16,10 @@ import XMonad
 import qualified XMonad.StackSet as W
 import XMonad.StackSet (modify')
 
-import Control.Lens
 import Data.Foldable
 import Data.Function (on)
 import Data.List (sortBy)
 import Debug.Trace
-import Text.Read
 import WindowColumn
   ( Column(Left, Middle, Right)
   , SwopSideColumnWindow(..)
@@ -28,100 +31,19 @@ import WindowColumn
   , WindowPosition (..)
   )
 
+import FileLogger
+-- import WindowCoordinates
+import Operations
+import Types
+
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
 
-data ModifySideContainer
-  = IncrementLeftColumnContainer
-  | IncrementRightColumnContainer
-  | ResetColumnContainer
-  deriving (Typeable)
 
-instance Message ModifySideContainer
-
-data ModifySideContainerWidth
-  = IncrementLeftColumnContainerWidth
-  | IncrementRightColumnContainerWidth
-  | DecrementLeftColumnContainerWidth
-  | DecrementRightColumnContainerWidth
-  | ResetColumnContainerWidth
-  deriving (Typeable)
-
-instance Message ModifySideContainerWidth
-
-data FocusSideColumnWindow n
-  = FocusLeft n
-  | FocusRight n
-  deriving (Typeable)
-
-instance Message (FocusSideColumnWindow Int)
-
-data SwopSideColumn
-  = SwopLeftColumn
-  | SwopRightColumn
-  | ResetColumn
-  deriving (Show, Typeable)
-
-instance Message (SwopSideColumn)
-
-data ModifyLayout =
-  ModifyLayout (MiddleColumnModify)
-
-instance Message (MiddleColumnModify)
-
-data ToggleMasterColumnSplit = ToggleMasterColumnSplit
-instance Message (ToggleMasterColumnSplit)
-
-instance Read SwopSideColumn where
-  readPrec = return (ResetColumn)
-  readListPrec = readListPrecDefault
-
+masterColumnWindowCount :: MiddleColumn a -> Int
 masterColumnWindowCount l = _middleColumnCount l + case (_splitMasterWindow l) of
         Nothing -> 0
         Just x -> (x - 1)
-
-data MiddleColumnModify = MiddleColumnModify
-  { modifySplitRatio :: Float -> Float
-  , modifyMiddleColumnCount :: Int -> Int
-  , modifyDeltaIncrement :: Float -> Float
-  , modifyMiddleTwoRatio :: Float -> Float
-  , modifyMiddleThreeRatio :: (Float, Float, Float) -> (Float, Float, Float) -- ratio of window height when two windows are in the middle column,
-  , modifyLeftContainerWidth :: Maybe (Float) -> Maybe (Float)
-  , modifyRightContainerWidth :: Maybe (Float) -> Maybe (Float)
-  , modifyLeftContainerCount :: Int -> Int
-  , modifyRightContainerCount :: Int -> Int
-  , modifyColumnSwop :: SwopSideColumn -> SwopSideColumn
-  }
-
-modifyMiddleColumn :: MiddleColumnModify -> MiddleColumn a -> MiddleColumn a
-modifyMiddleColumn mcm@MiddleColumnModify{..} mc = 
-  mc
-  { _splitRatio = modifySplitRatio $ _splitRatio mc
-  , _middleColumnCount = modifyMiddleColumnCount $ _middleColumnCount mc
-  , _deltaIncrement = modifyDeltaIncrement $ _deltaIncrement mc
-  , _middleTwoRatio = modifyMiddleTwoRatio $ _middleTwoRatio mc
-  , _middleThreeRatio = modifyMiddleThreeRatio $ _middleThreeRatio mc
-  , _leftContainerWidth = modifyLeftContainerWidth $ _leftContainerWidth mc
-  , _rightContainerWidth = modifyRightContainerWidth $ _rightContainerWidth mc
-  , _leftContainerCount = modifyLeftContainerCount $ _leftContainerCount mc
-  , _rightContainerCount = modifyRightContainerCount $ _rightContainerCount mc
-  , _columnSwop = modifyColumnSwop $ _columnSwop mc
-  }
-
-middleColumnModifyId :: MiddleColumnModify
-middleColumnModifyId =
-  MiddleColumnModify
-  { modifySplitRatio = id
-  , modifyMiddleColumnCount = id
-  , modifyDeltaIncrement = id
-  , modifyMiddleTwoRatio = id
-  , modifyMiddleThreeRatio = id
-  , modifyLeftContainerWidth = id
-  , modifyRightContainerWidth = id
-  , modifyLeftContainerCount = id
-  , modifyRightContainerCount = id
-  , modifyColumnSwop = id
-  }
 
 getMiddleColumnSaneDefault ::
      Int -> Float -> (Float, Float, Float) -> MiddleColumn a
@@ -140,27 +62,7 @@ getMiddleColumnSaneDefault mColumnCount mTwoRatio mThreeRatio =
   , _columnSwop = ResetColumn
   }
 
-data MiddleColumnEnum
-  = LColumn
-  | MColumn
-  | RColumn
-
 -- Example: MiddleColumn 0.25 1 0.040 0.25
-data MiddleColumn a = MiddleColumn
-  { _splitRatio :: Float -- width ratio of side columns
-  , _splitMasterWindow :: Maybe (Int)
-  , _middleColumnCount :: Int -- number of windows in middle column
-  , _deltaIncrement :: Float
-  , _middleTwoRatio :: Float -- ratio of window height when two windows are in the middle column,
-  , _middleThreeRatio :: (Float, Float, Float) -- ratio of window height when two windows are in the middle column,
-  , _leftContainerWidth :: Maybe (Float)
-  , _rightContainerWidth :: Maybe (Float)
-  , _leftContainerCount :: Int
-  , _rightContainerCount :: Int
-  , _columnSwop :: SwopSideColumn
-  } deriving (Show, Read)
-
-makeLenses ''MiddleColumn
 
 -- If zero then return no rectangles
 splitVerticallyFixed :: Int -> Rectangle -> [Rectangle]
@@ -190,7 +92,6 @@ splitHorizontallyByRatios ratios mainR@(Rectangle _ _ w _) = do
           ratios
   xAccumulateRecatangle widthSet
   where
-
 
 splitVerticallyByRatios :: [Float] -> Rectangle -> [Rectangle]
 splitVerticallyByRatios f =
@@ -225,9 +126,6 @@ columnSwops l (middleRec:leftRec:rightRec:[]) =
     SwopRightColumn -> [rightRec, leftRec, middleRec]
 columnSwops _ r = r
 
-ifNothing :: Maybe a -> a -> Maybe a
-ifNothing (Just x) _ = Just x
-ifNothing (Nothing) v = Just v
 
 layoutRectangles :: MiddleColumn a1 -> Rectangle -> W.Stack a -> [(a, Rectangle)]
 layoutRectangles l screenRec s = zip ws (a++b++c) where
@@ -270,10 +168,11 @@ layoutRectangles' l screenRec s = recs s
 instance LayoutClass MiddleColumn a where
   description _ = "MiddleColumn"
   doLayout l r s = do
+    logM "doLayout???"
     let mcc = _middleColumnCount l
     let lContainerCount = _leftContainerCount l
     let rContainerCount = _rightContainerCount l
-    let sideColumnWindowCount = (length $ W.integrate s) - mcc
+    let sideColumnWindowCount = (logM' "doLayout WindowCount:" $ length $ W.integrate s) - mcc
     let l' =
           if (lContainerCount > 0)
             then l {_leftContainerCount = lcc, _rightContainerCount = -(lcc)}
@@ -288,7 +187,7 @@ instance LayoutClass MiddleColumn a where
             rcc = min sideColumnWindowCount rContainerCount
     return (pureLayout l' r s, Just l')
   pureLayout = layoutRectangles
-  pureMessage l m =
+  pureMessage l m = do
     msum
       [ fmap resize (fromMessage m)
       , fmap incmastern (fromMessage m)
@@ -309,7 +208,7 @@ instance LayoutClass MiddleColumn a where
   handleMessage l m = do
     ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
     let windowCount =
-          (traceTraceShowId "WindowCount:" $ maybe 0 (length . W.integrate) ws)
+          (logM' "WindowCount:" $ maybe 0 (length . W.integrate) ws)
     let leftWindowOffset =
           traceTraceShowId "leftWindowOffset:" $ (_middleColumnCount l - 1)
     let possibleMessages =
@@ -343,7 +242,7 @@ instance LayoutClass MiddleColumn a where
           , case (fromMessage m :: Maybe (SwopTo)) of
               (Just (SwopTo f t)) ->
                 return $ do
-                  let (leftWindowCount,rightWindowCount) = (\(_,l,r) -> (length l, length r)) $ layoutRectangles' l (Rectangle 1000 1000 1000 1000) (length ws)
+                  let (leftWindowCount,rightWindowCount) = (\(_,l',r') -> (length l', length r')) $ layoutRectangles' l (Rectangle 1000 1000 1000 1000) (length ws)
                   let f' = getWindowIndex f leftWindowOffset leftWindowCount rightWindowCount windowCount
                   let t' = getWindowIndex t leftWindowOffset leftWindowCount rightWindowCount windowCount
                   windows $ modify' $ swopStackElements f' (t')
@@ -352,7 +251,7 @@ instance LayoutClass MiddleColumn a where
           , case (fromMessage m :: Maybe (ToggleMasterColumnSplit)) of
               (Just ToggleMasterColumnSplit) -> return $ do
                 case _splitMasterWindow l of
-                  Just x -> return $ Just (l {_splitMasterWindow = Nothing})
+                  Just _ -> return $ Just (l {_splitMasterWindow = Nothing})
                   Nothing -> return $ Just (l {_splitMasterWindow = Just 2})
               _ -> Nothing
           ]
@@ -371,41 +270,6 @@ getWindowIndex w leftWindowOffset leftWindowCount rightWindowCount windowCount =
       Down -> getLastNthWindowIndex (wIndex w - (rightWindowCount)) windowCount
     WindowColumn.Middle -> (wIndex w)
 
-widthDelta :: Float
-widthDelta = 0.02
-
-widthInc, widthDec :: Float -> Float
-widthInc = (+ widthDelta)
-
-widthDec = flip (-) widthDelta
-
-incSideContainer :: ModifySideContainer -> MiddleColumn l -> MiddleColumn l
-incSideContainer IncrementLeftColumnContainer =
-  (leftContainerCount +~ 1) . (rightContainerCount -~ 1)
-incSideContainer IncrementRightColumnContainer =
-  (leftContainerCount -~ 1) . (rightContainerCount +~ 1)
-incSideContainer ResetColumnContainer =
-  (leftContainerCount .~ 0) . (rightContainerCount .~ 0)
-
-colWidthOver ::
-     (Float -> b)
-  -> ASetter (MiddleColumn a) t (Maybe Float) (Maybe b)
-  -> MiddleColumn a
-  -> t
-colWidthOver f v l = over v (\val -> f <$> ifNothing val (_splitRatio l)) l
-
-incSideContainerWidth ::
-     MiddleColumn l -> ModifySideContainerWidth -> MiddleColumn l
-incSideContainerWidth l IncrementLeftColumnContainerWidth =
-  colWidthOver widthInc leftContainerWidth l
-incSideContainerWidth l IncrementRightColumnContainerWidth =
-  colWidthOver widthInc rightContainerWidth l
-incSideContainerWidth l DecrementLeftColumnContainerWidth =
-  colWidthOver widthDec leftContainerWidth l
-incSideContainerWidth l DecrementRightColumnContainerWidth =
-  colWidthOver widthDec rightContainerWidth l
-incSideContainerWidth l ResetColumnContainerWidth =
-  (leftContainerWidth .~ Nothing) . (rightContainerWidth .~ Nothing) $ l
 
 mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
 mainSplit z (Rectangle sx sy sw sh) = columnSwops z [m, l, r]

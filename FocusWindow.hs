@@ -4,11 +4,11 @@ module FocusWindow where
 import XMonad.StackSet (Stack(Stack), focus, up, down)
 import qualified XMonad.StackSet as W
 import Debug.Trace
-import System.IO.Unsafe (unsafePerformIO)
+--import System.IO.Unsafe (unsafePerformIO)
 import XMonad (windows, X, WindowSet, XState(XState, windowset))
 import Control.Monad.State
 import Data.Bool
-import FileLogger
+--import FileLogger
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
