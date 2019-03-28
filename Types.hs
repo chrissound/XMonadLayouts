@@ -7,6 +7,7 @@ module Types where
 import XMonad
 import Text.Read
 import Control.Lens
+import WindowColumn
 
 data MiddleColumnModify = MiddleColumnModify
   { modifySplitRatio :: Float -> Float
@@ -54,7 +55,10 @@ data FocusSideColumnWindow n
   = FocusLeft n
   | FocusRight n
   deriving (Typeable)
+newtype FocusWindow' a = FocusWindow' a
+-- newtype FocusWindow' = FocusWindow' WindowPosition deriving (Typeable)
 
+instance Message (FocusWindow' WindowPosition)
 instance Message (FocusSideColumnWindow Int)
 
 

@@ -6,6 +6,7 @@ module Operations where
 
 import Types
 import Control.Lens
+import XMonad
 
 
 incSideContainer :: ModifySideContainer -> MiddleColumn l -> MiddleColumn l
@@ -77,3 +78,11 @@ middleColumnModifyId =
   , modifyRightContainerCount = id
   , modifyColumnSwop = id
   }
+
+columnSwops :: MiddleColumn a -> [Rectangle] -> [Rectangle]
+columnSwops l (middleRec:leftRec:rightRec:[]) =
+  case (_columnSwop l) of
+    ResetColumn -> [middleRec, leftRec, rightRec]
+    SwopLeftColumn -> [leftRec, middleRec, rightRec]
+    SwopRightColumn -> [rightRec, leftRec, middleRec]
+columnSwops _ r = r

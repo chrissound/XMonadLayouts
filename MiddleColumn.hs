@@ -21,18 +21,18 @@ import Data.Function (on)
 import Data.List (sortBy)
 import Debug.Trace
 import WindowColumn
-  ( Column(Left, Middle, Right)
-  , SwopSideColumnWindow(..)
-  , SwopTo(SwopTo)
-  , wColumn
-  , wIndex
-  , wDirection
-  , WindowDirection (..)
-  , WindowPosition (..)
-  )
+  -- ( Column(Left, Middle, Right)
+  -- , SwopSideColumnWindow(..)
+  -- , SwopTo(SwopTo)
+  -- , wColumn
+  -- , wIndex
+  -- , wDirection
+  -- , WindowDirection (..)
+  -- , WindowPosition (..)
+  -- )
 
 import FileLogger
--- import WindowCoordinates
+import WindowCoordinates
 import Operations
 import Types
 
@@ -118,13 +118,6 @@ getRecsWithSideContainment lRec rRec leftMax rightMax totalCount =
     else ( splitVerticallyFixed (totalCount - rightMax) lRec
          , splitVerticallyFixed rightMax rRec)
 
-columnSwops :: MiddleColumn a -> [Rectangle] -> [Rectangle]
-columnSwops l (middleRec:leftRec:rightRec:[]) =
-  case (_columnSwop l) of
-    ResetColumn -> [middleRec, leftRec, rightRec]
-    SwopLeftColumn -> [leftRec, middleRec, rightRec]
-    SwopRightColumn -> [rightRec, leftRec, middleRec]
-columnSwops _ r = r
 
 
 layoutRectangles :: MiddleColumn a1 -> Rectangle -> W.Stack a -> [(a, Rectangle)]
@@ -165,7 +158,14 @@ layoutRectangles' l screenRec s = recs s
               (_rightContainerCount l)
               (wl - masterColumnWindowCount l)
 
+getWindowCount :: X Int
+getWindowCount = length . W.integrate' . W.stack . W.workspace . W.current . windowset <$> get
+
+getScreenRes :: X Rectangle
+getScreenRes = screenRect . W.screenDetail . W.current . windowset <$> get
+
 instance LayoutClass MiddleColumn a where
+
   description _ = "MiddleColumn"
   doLayout l r s = do
     logM "doLayout???"
@@ -212,7 +212,25 @@ instance LayoutClass MiddleColumn a where
     let leftWindowOffset =
           traceTraceShowId "leftWindowOffset:" $ (_middleColumnCount l - 1)
     let possibleMessages =
-          [ case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
+          [
+            case (fromMessage m :: Maybe (FocusWindow' WindowPosition)) of
+              (Just (FocusWindow' wp)) ->
+                return $ do
+                  sr <- getScreenRes
+                  case ws of
+                    Just ws' -> do
+                      r <- pure $ (snd) <$> (layoutRectangles l sr ws')
+                      case (windowPositionToStacksetIndex wp r) of
+                        Just i -> do
+                          windows $
+                            focusWindow $
+                            (traceTraceShowId "FocusWindow:" i)
+                          return Nothing
+                        Nothing -> error "???"
+                    Nothing -> pure Nothing
+              _ -> do
+                Nothing
+            , case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
               (Just (FocusLeft n)) ->
                 return $ do
                   windows $

@@ -3,6 +3,9 @@
 module WindowColumn where
 
 import           XMonad
+import qualified XMonad.StackSet as W
+import WindowCoordinates
+import Data.List
 
 data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving (Show, Typeable)
 instance Message (SwopSideColumnWindow Int)
@@ -21,3 +24,14 @@ data SwopTo = SwopTo
 
   deriving (Show)
 instance Message (SwopTo)
+
+windowPositionToWindow :: WindowPosition -> [Rectangle] -> Rectangle
+windowPositionToWindow wp r = case (wColumn wp, wDirection wp) of
+  (WindowColumn.Left, Up) -> topLeftSort r        !! (wIndex wp - 1)
+  (WindowColumn.Left, Down) -> bottomLeftSort r   !! (wIndex wp - 1)
+  (WindowColumn.Right, Up) -> topRightSort r      !! (wIndex wp - 1)
+  (WindowColumn.Right, Down) -> bottomRightSort r !! (wIndex wp - 1)
+  _ -> error ""
+
+windowPositionToStacksetIndex :: WindowPosition -> [Rectangle] -> Maybe Int
+windowPositionToStacksetIndex wp r = elemIndex (windowPositionToWindow wp r) r
