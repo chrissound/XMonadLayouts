@@ -38,6 +38,7 @@ import WindowFinder
 import FileLogger
 import FocusWindow
 import XMonad.Layout.MasterOverlay
+-- import XMonad.Layout.SwopWindow
 
 
 data TitleBars = TitleBars deriving (Read, Show, Eq, Typeable)
@@ -177,7 +178,7 @@ myKeys _undefined@XConfig {XMonad.modMask = modm} =
               )
             , ((modm, xK_n), submap . M.fromList $ [ -- navigate to program
                 (singleKey xK_b, do
-                    win' <- findWindowsByClass "Chromium"
+                    win' <- findWindowsByRole ("browser")
                     when (length win' > 0)
                       (windows $ W.focusWindow $ head win')
                 )
@@ -187,7 +188,7 @@ myKeys _undefined@XConfig {XMonad.modMask = modm} =
                       (windows $ W.focusWindow $ head win')
                 )
               , (singleKey xK_m, do
-                    win' <- findWindowsByClass "Thunderbird"
+                    win' <- findWindowsByRole ("mail")
                     when (length win' > 0)
                       (windows $ W.focusWindow $ head win')
                 )
@@ -212,14 +213,17 @@ myKeys _undefined@XConfig {XMonad.modMask = modm} =
             -- Float window
             , ((modm, xK_x), withFocused (\f -> windows $ W.float f (W.RationalRect (6/10) (1/4) (1/3) (1/3))))
             --
-            , ((modm, xK_c), submap . M.fromList $ -- focus specific window and swop it with master -- TODO refactor to use WindowPositon
+            , ((modm, xK_c), submap . M.fromList $ -- swop current focused window with one in the left/right column
                 fmap
                   (\(c, i) ->
                     (singleKey (windowSelection c i), sendMessage $
-                      case c of
-                        Column.Left -> SwopLeft i
-                        Column.Right -> SwopRight i
-                        ))
+                      SwopWindow' $
+                        WindowPosition {
+                            wDirection = Up
+                          , wColumn = c
+                          , wIndex = i
+                          }
+                    ))
                   $ concat [
                       fmap ((,) Column.Left) [1,2,3,4,5,6,7,8]
                     , fmap ((,) Column.Right) [1,2,3,4,5,6,7,8]                        ]

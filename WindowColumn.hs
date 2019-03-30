@@ -3,7 +3,6 @@
 module WindowColumn where
 
 import           XMonad
-import qualified XMonad.StackSet as W
 import WindowCoordinates
 import Data.List
 

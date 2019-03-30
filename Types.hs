@@ -55,11 +55,12 @@ data FocusSideColumnWindow n
   = FocusLeft n
   | FocusRight n
   deriving (Typeable)
-newtype FocusWindow' a = FocusWindow' a
--- newtype FocusWindow' = FocusWindow' WindowPosition deriving (Typeable)
-
-instance Message (FocusWindow' WindowPosition)
 instance Message (FocusSideColumnWindow Int)
+
+newtype FocusWindow' a = FocusWindow' a
+instance Message (FocusWindow' WindowPosition)
+newtype SwopWindow' a = SwopWindow' a
+instance Message (SwopWindow' WindowPosition)
 
 
 instance Message (SwopSideColumn)

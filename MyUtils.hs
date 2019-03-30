@@ -3,6 +3,7 @@ module MyUtils where
 import XMonad
 import XMonad.Operations
 import XMonad.StackSet
+import XMonad.StackSet as W
 import MiddleColumn
 
 -- modifyLayout :: (l -> l) -> X ()
@@ -21,3 +22,10 @@ import MiddleColumn
 --     if tag ww == i
 --       then ww {layout = f (layout ww)}
 --       else ww
+
+
+getWindowCount :: X Int
+getWindowCount = length . W.integrate' . W.stack . W.workspace . W.current . windowset <$> get
+
+getScreenRes :: X Rectangle
+getScreenRes = screenRect . W.screenDetail . W.current . windowset <$> get

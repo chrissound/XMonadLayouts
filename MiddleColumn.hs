@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -Wno-orphans #-}
 
 module MiddleColumn (
@@ -32,7 +33,8 @@ import WindowColumn
   -- )
 
 import FileLogger
-import WindowCoordinates
+-- import WindowCoordinates
+import WindowFinder
 import Operations
 import Types
 
@@ -230,32 +232,23 @@ instance LayoutClass MiddleColumn a where
                     Nothing -> pure Nothing
               _ -> do
                 Nothing
-            , case (fromMessage m :: Maybe (FocusSideColumnWindow Int)) of
-              (Just (FocusLeft n)) ->
-                return $ do
-                  windows $
-                    focusWindow $
-                    (traceTraceShowId "FocusLeft:" n) + leftWindowOffset
-                  return Nothing
-              (Just (FocusRight n)) ->
-                return $ do
-                  windows $
-                    focusWindow $
-                    getLastNthWindowIndex
-                      (traceTraceShowId "FocusRight:" n)
-                      windowCount
-                  return Nothing
-              _ -> do
-                Nothing
-          , case (fromMessage m :: Maybe (SwopSideColumnWindow Int)) of
-              (Just (SwopLeft n)) ->
-                return $ do
-                  swopWindowToMaster $ n + leftWindowOffset
-                  return Nothing
-              (Just (SwopRight n)) ->
-                return $ do
-                  swopWindowToMaster $ (getLastNthWindowIndex n windowCount)
-                  return Nothing
+
+            ,case (fromMessage m :: Maybe (SwopWindow' WindowPosition)) of
+              (Just (SwopWindow' wp)) -> return $ do
+                  sr <- getScreenRes
+                  ws''' <- withWindowSet pure
+                  case ws of
+                    Just ws' -> do
+                      r <- pure $ (snd) <$> (layoutRectangles l sr ws')
+                      case (windowPositionToStacksetIndex wp r) of
+                        Just i -> do
+                            pure (W.peek ws''' >>= (flip windowIndex) ws''') >>= \case
+                              Just (currentWindowIndex' :: Int) -> do
+                                windows . W.modify' $ swopStackElements i currentWindowIndex'
+                                windows $ focusWindow currentWindowIndex'
+                                return Nothing
+                              _ -> pure Nothing
+                    Nothing -> pure Nothing
               _ -> Nothing
           , case (fromMessage m :: Maybe (SwopTo)) of
               (Just (SwopTo f t)) ->

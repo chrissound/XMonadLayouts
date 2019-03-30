@@ -8,9 +8,11 @@ import XMonad
 import qualified XMonad.StackSet as W
 import XMonad.StackSet
 import Data.List (elemIndex)
+import XMonad.Util.WindowProperties
 
 windowIndex :: Eq a => a -> StackSet i l a s sd -> Maybe Int
 windowIndex w s = elemIndex w $ allWindowsInCurrentWorkspace s
+
 
 findWindows ::
      (WindowSet -> [Window])
@@ -26,6 +28,9 @@ findWindows aa f ff' = do
             (withDisplay $ \d -> liftIO $ f d w) >>= \s ->
               return $ bool [] [w] (ff' s) :: X [Window]) >>=
          return . join)
+
+findWindowsByRole :: String -> X [Window]
+findWindowsByRole = allWithProperty . Role
 
 findWindowsByClass :: String -> X [Window]
 findWindowsByClass n =
