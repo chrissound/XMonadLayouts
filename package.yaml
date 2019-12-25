@@ -1,0 +1,25 @@
+name: my-xmonad
+version: '0.2.0.0'
+author: Chris Stryczynski
+maintainer: chris@soundshare.co.uk
+license: GPL-2
+dependencies:
+- base
+- xmonad
+- xmonad-contrib
+- mtl
+- containers
+- process
+- lens
+- X11
+- time
+- pretty-simple
+- string-conversions
+- deepseq
+executables:
+  xmonad:
+    main: xmonad.hs
+    source-dirs: lib
+    ghc-options: -O2
+default-extensions: 
+  - LambdaCase
