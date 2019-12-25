@@ -12,6 +12,9 @@ import Data.Time.Clock
 -- import Control.Monad.IO.Class
 import Data.Time.Format
 import MyAppendFile
+import Text.Pretty.Simple
+import Data.String.Conversions
+-- import Control.DeepSeq
 
 logToTmpFile :: String -> IO ()
 logToTmpFile = myAppendFile "/tmp/xmonad.log" . (++ "\n")
@@ -24,9 +27,9 @@ logToTmpFile = myAppendFile "/tmp/xmonad.log" . (++ "\n")
 logM :: Applicative m => a -> m ()
 logM = const $ pure ()
 
--- log :: (Show a) => a -> ()
--- log s = unsafePerformIO $! do
---       logToTmpFile $ showkk s
+log' :: (Show a) => a -> ()
+log' s = unsafePerformIO $! do
+      logToTmpFile $ show s
 
 logM' :: String -> a -> a
 logM' = const $ (id)
@@ -39,6 +42,12 @@ logM' = const $ (id)
 logExtra  :: (Show a) => String -> a -> ()
 logExtra a s = unsafePerformIO $! do
       logToTmpFile $ a ++ show s
+
+logid  :: (Show a) => a -> a
+logid a = do
+  unsafePerformIO $! do
+      logToTmpFile $ cs $ pShow a
+      pure a
 
 myFormatUtcTime :: UTCTime -> String
 myFormatUtcTime = formatTime defaultTimeLocale "%H:%M:%S"

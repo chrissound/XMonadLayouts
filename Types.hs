@@ -7,7 +7,6 @@ module Types where
 import XMonad
 import Text.Read
 import Control.Lens
-import WindowColumn
 
 data MiddleColumnModify = MiddleColumnModify
   { modifySplitRatio :: Float -> Float
@@ -27,6 +26,11 @@ data SwopSideColumn
   | SwopRightColumn
   | ResetColumn
   deriving (Show, Typeable)
+
+data SwopSideColumnWindow n = SwopLeft n | SwopRight n deriving (Show, Typeable)
+instance Message (SwopSideColumnWindow Int)
+
+data Column = Left | Middle | Right deriving Show
 
 instance Read SwopSideColumn where
   readPrec = return (ResetColumn)
@@ -57,10 +61,16 @@ data FocusSideColumnWindow n
   deriving (Typeable)
 instance Message (FocusSideColumnWindow Int)
 
+data WindowDirection = Up | Down deriving Show
+
+data WindowPosition = WindowPosition { wIndex :: Int, wColumn ::  Column, wDirection ::  WindowDirection} deriving Show
+
+
 newtype FocusWindow' a = FocusWindow' a
 instance Message (FocusWindow' WindowPosition)
-newtype SwopWindow' a = SwopWindow' a
-instance Message (SwopWindow' WindowPosition)
+data SwopWindow' = SwopWindow' WindowPosition | SwopWindowIndex Int | SwopWindowWindow Window deriving Show
+  -- | SwopWindowWindow Window deriving Show
+instance Message (SwopWindow')
 
 
 instance Message (SwopSideColumn)
@@ -70,12 +80,15 @@ data ModifyLayout =
 
 instance Message (MiddleColumnModify)
 
-data ToggleMasterColumnSplit = ToggleMasterColumnSplit
+data ToggleMasterColumnSplit = ToggleMasterColumnSplit | ToggleMasterColumnSplitAll deriving (Read,Show, Eq)
 instance Message (ToggleMasterColumnSplit)
+
+data RearrangeWindows = RearrangeWindows deriving (Read,Show, Eq)
+instance Message (RearrangeWindows)
 
 data MiddleColumn a = MiddleColumn
   { _splitRatio :: Float -- width ratio of side columns
-  , _splitMasterWindow :: Maybe (Int)
+  , _splitMasterWindow :: Maybe (ToggleMasterColumnSplit)
   , _middleColumnCount :: Int -- number of windows in middle column
   , _deltaIncrement :: Float
   , _middleTwoRatio :: Float -- ratio of window height when two windows are in the middle column,
@@ -94,3 +107,25 @@ data MiddleColumnEnum
   = LColumn
   | MColumn
   | RColumn
+
+data SwopTo' = SwopTo'
+  {
+    from' :: SwopWindow'
+  , to' :: SwopWindow'
+  }
+
+  deriving (Show)
+instance Message (SwopTo')
+
+
+
+-- data SwopTo = SwopTo
+--   {
+--     from :: WindowPosition
+--   , to :: WindowPosition
+--   }
+
+--   deriving (Show)
+-- instance Message (SwopTo)
+
+type MiddleColumnRecs = ([Rectangle],[Rectangle],[Rectangle])

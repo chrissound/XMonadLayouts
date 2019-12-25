@@ -8,13 +8,19 @@ import Debug.Trace
 import XMonad (windows, X, WindowSet, XState(XState, windowset))
 import Control.Monad.State
 import Data.Bool
---import FileLogger
+import MyDebug
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
 
-getLast :: Int -> [a] -> a
-getLast n = head . reverse . take n . reverse
+getLast :: Show a => Int -> [a] -> a
+getLast n x = do
+  let z = reverse . take n . reverse $ x 
+  if length z > 1 then
+    head z
+  else
+    error $ show x <> " ?? " <> show n <> "?????????"
+
 
 focusWindow ::(Eq s, Eq a, Eq i) => Int -> W.StackSet i l a s sd -> W.StackSet i l a s sd
 focusWindow n x = if (nFetch <= (windowLength))
@@ -24,7 +30,7 @@ focusWindow n x = if (nFetch <= (windowLength))
     windowLength = length $ W.index x
     nFetch = if (n > 0)
           then n
-          else getLastNthWindowIndex n windowLength
+          else getLastNthWindowIndex (mdid' MyDebugFunctions "n" n) (mdid' MyDebugFunctions "windowLength" windowLength)
 
 getLastNthWindowIndex :: Int -> Int -> Int
 getLastNthWindowIndex n wl = bool (wl - 1) (getLast n [0..wl -1]) (n < (wl))
@@ -47,8 +53,11 @@ swopStackElements i j s@(W.Stack _ t b) = do
   let z = zipWith (,) wsp swopped
   let nU = filter ((==) Top . fst) z
   let nB = filter ((==) Bottom . fst) z
-  let nF = snd . head $ filter ((==) Focus . fst) z
-  Stack { focus = nF, up = reverse $ snd <$> nU, down = snd <$> nB }
+  let nF = filter ((==) Focus . fst) z
+  if (length nF) == 1 then 
+    Stack { focus = snd $ head nF, up = reverse $ snd <$> nU, down = snd <$> nB }
+  else
+   error "???????"
 
 swopWindowToMaster :: Int -> X ()
 swopWindowToMaster n = do

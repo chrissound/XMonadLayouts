@@ -33,10 +33,12 @@ import WindowColumn
   -- )
 
 import FileLogger
+import MyDebug
 -- import WindowCoordinates
 import WindowFinder
 import Operations
 import Types
+-- import RearrangeWindows
 
 traceTraceShowId :: Show a => String -> a -> a
 traceTraceShowId x = traceShow x . traceShowId
@@ -45,7 +47,8 @@ traceTraceShowId x = traceShow x . traceShowId
 masterColumnWindowCount :: MiddleColumn a -> Int
 masterColumnWindowCount l = _middleColumnCount l + case (_splitMasterWindow l) of
         Nothing -> 0
-        Just x -> (x - 1)
+        Just (ToggleMasterColumnSplit) -> 1
+        Just (ToggleMasterColumnSplitAll) -> (_middleColumnCount l)
 
 getMiddleColumnSaneDefault ::
      Int -> Float -> (Float, Float, Float) -> MiddleColumn a
@@ -122,13 +125,13 @@ getRecsWithSideContainment lRec rRec leftMax rightMax totalCount =
 
 
 
-layoutRectangles :: MiddleColumn a1 -> Rectangle -> W.Stack a -> [(a, Rectangle)]
+layoutRectangles :: Show a => MiddleColumn a1 -> Rectangle -> W.Stack a -> [(a, Rectangle)]
 layoutRectangles l screenRec s = zip ws (a++b++c) where
-      ws = W.integrate s
+      ws = W.integrate (mdid' MyDebugXmonadWin "the stack" s)
       (a,b,c) = layoutRectangles' l screenRec $ length ws
 
 layoutRectangles' :: MiddleColumn a1 -> Rectangle -> Int -> ([Rectangle],[Rectangle],[Rectangle])
-layoutRectangles' l screenRec s = recs s
+layoutRectangles' l screenRec s = mdid' MyDebugRecs "recs" $ (middleRecs, leftInnerRecs, rightInnerRecs)
     where
       mcc = (_middleColumnCount l)
       mctRatio = _middleTwoRatio l
@@ -138,7 +141,11 @@ layoutRectangles' l screenRec s = recs s
       middleRecs =
         case _splitMasterWindow l of
           Nothing -> id
-          Just x -> (\(r:rx) -> (splitHorizontally x r) ++ rx)
+          Just ToggleMasterColumnSplit -> -- (\(r:rx) -> (splitHorizontally x r) ++ rx)
+            (\(r:rx) -> (splitHorizontally 2 r) ++ rx)
+          Just ToggleMasterColumnSplitAll -> -- (\(r:rx) -> (splitHorizontally x r) ++ rx)
+          -- Just x -> -- (\(r:rx) -> (splitHorizontally x r) ++ rx)
+           (join . fmap (splitHorizontally 2))
         $
         -- If there are two windows in the "middle column", make the larger window the master
         if (mcc == 2)
@@ -150,15 +157,14 @@ layoutRectangles' l screenRec s = recs s
                         ((\(m1, m2, m3) -> [m1, m2, m3]) mc3Ratio)
                         middleRec
                  else splitVertically mcc middleRec
-      recs wl = (middleRecs, leftInnerRecs, rightInnerRecs)
-        where
-          (leftInnerRecs, rightInnerRecs) =
-            getRecsWithSideContainment
-              leftRec
-              rightRec
-              (_leftContainerCount l)
-              (_rightContainerCount l)
-              (wl - masterColumnWindowCount l)
+      (leftInnerRecs, rightInnerRecs) =
+        mdid' MyDebugRecs "recs" $
+        getRecsWithSideContainment
+          leftRec
+          rightRec
+          (_leftContainerCount l)
+          (_rightContainerCount l)
+          ((mdid' MyDebugRecs "sssss" s) - (mdid' MyDebugRecs "..." $ masterColumnWindowCount l))
 
 getWindowCount :: X Int
 getWindowCount = length . W.integrate' . W.stack . W.workspace . W.current . windowset <$> get
@@ -166,15 +172,15 @@ getWindowCount = length . W.integrate' . W.stack . W.workspace . W.current . win
 getScreenRes :: X Rectangle
 getScreenRes = screenRect . W.screenDetail . W.current . windowset <$> get
 
-instance LayoutClass MiddleColumn a where
+instance (Show a) => LayoutClass MiddleColumn a where
 
   description _ = "MiddleColumn"
   doLayout l r s = do
     logM "doLayout???"
-    let mcc = _middleColumnCount l
+    let mcc = masterColumnWindowCount l
     let lContainerCount = _leftContainerCount l
     let rContainerCount = _rightContainerCount l
-    let sideColumnWindowCount = (logM' "doLayout WindowCount:" $ length $ W.integrate s) - mcc
+    let sideColumnWindowCount = (mdid' MyDebugXmonadWin "sideColumnWindowCount" $ length $ W.integrate s) - mcc
     let l' =
           if (lContainerCount > 0)
             then l {_leftContainerCount = lcc, _rightContainerCount = -(lcc)}
@@ -209,10 +215,6 @@ instance LayoutClass MiddleColumn a where
       incmastern (IncMasterN x) = l {_middleColumnCount = max 0 (mcc + x)}
   handleMessage l m = do
     ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
-    let windowCount =
-          (logM' "WindowCount:" $ maybe 0 (length . W.integrate) ws)
-    let leftWindowOffset =
-          traceTraceShowId "leftWindowOffset:" $ (_middleColumnCount l - 1)
     let possibleMessages =
           [
             case (fromMessage m :: Maybe (FocusWindow' WindowPosition)) of
@@ -232,8 +234,7 @@ instance LayoutClass MiddleColumn a where
                     Nothing -> pure Nothing
               _ -> do
                 Nothing
-
-            ,case (fromMessage m :: Maybe (SwopWindow' WindowPosition)) of
+            ,case (fromMessage m :: Maybe (SwopWindow')) of
               (Just (SwopWindow' wp)) -> return $ do
                   sr <- getScreenRes
                   ws''' <- withWindowSet pure
@@ -244,42 +245,61 @@ instance LayoutClass MiddleColumn a where
                         Just i -> do
                             pure (W.peek ws''' >>= (flip windowIndex) ws''') >>= \case
                               Just (currentWindowIndex' :: Int) -> do
-                                windows . W.modify' $ swopStackElements i currentWindowIndex'
-                                windows $ focusWindow currentWindowIndex'
+                                Debug.Trace.trace "swopstack..." windows . W.modify' $ swopStackElements i currentWindowIndex'
                                 return Nothing
                               _ -> pure Nothing
+                        Nothing -> pure Nothing
                     Nothing -> pure Nothing
               _ -> Nothing
-          , case (fromMessage m :: Maybe (SwopTo)) of
-              (Just (SwopTo f t)) ->
-                return $ do
-                  let (leftWindowCount,rightWindowCount) = (\(_,l',r') -> (length l', length r')) $ layoutRectangles' l (Rectangle 1000 1000 1000 1000) (length ws)
-                  let f' = getWindowIndex f leftWindowOffset leftWindowCount rightWindowCount windowCount
-                  let t' = getWindowIndex t leftWindowOffset leftWindowCount rightWindowCount windowCount
-                  windows $ modify' $ swopStackElements f' (t')
-                  return $ Just l
+          , case (fromMessage m :: Maybe (SwopTo')) of
+              (Just (SwopTo' f t)) -> return $ do
+                sr <- getScreenRes
+                case ws of
+                  Just ws' -> do
+                    w <- pure $ (fst) <$> (layoutRectangles l sr ws')
+                    let myRecs = layoutRectangles' l (Rectangle 1000 1000 1000 1000) (length ws)
+                    let f' = normalizeSwopWindowPosition f w myRecs
+                    let t' = normalizeSwopWindowPosition t w myRecs
+                    case (f', t') of
+                      (Just f'', Just t'') -> do
+                        windows $ modify' $ swopStackElements f'' (t'')
+                        pure Nothing
+                      _ -> error "Unresolvable SwopTo param"
+                  _ -> pure Nothing
               _ -> Nothing
           , case (fromMessage m :: Maybe (ToggleMasterColumnSplit)) of
-              (Just ToggleMasterColumnSplit) -> return $ do
-                case _splitMasterWindow l of
-                  Just _ -> return $ Just (l {_splitMasterWindow = Nothing})
-                  Nothing -> return $ Just (l {_splitMasterWindow = Just 2})
+              x'''@(Just x) -> Just . pure $ Just (l {_splitMasterWindow = xx}) where
+                  xx = case _splitMasterWindow l of
+                    Nothing -> Just x
+                    _ ->
+                      if (_splitMasterWindow l == x''') then
+                        Nothing
+                      else
+                        Just x
+                -- return $ 
+                -- case _splitMasterWindow l of
+                --   Nothing -> return $ Just (l {_splitMasterWindow = Just x})
+                --   _ ->
+                --     if (_splitMasterWindow l == x''') then
+                --       return $ Just (l {_splitMasterWindow = Nothing})
+                --     else
+                --       return $ Just (l {_splitMasterWindow = Just x})
               _ -> Nothing
           ]
     case (asum possibleMessages) of
       Just x -> x
       _ -> return $ pureMessage l m
 
-getWindowIndex :: WindowColumn.WindowPosition -> Int -> Int -> Int -> Int -> Int
+getWindowIndex :: WindowPosition -> Int -> Int -> Int -> Int -> Int
 getWindowIndex w leftWindowOffset leftWindowCount rightWindowCount windowCount =
   case (wColumn w) of
-    WindowColumn.Left -> case (wDirection w) of
+    Types.Left -> case (wDirection w) of
       Up ->   leftWindowOffset + (wIndex w)
       Down -> leftWindowOffset - (wIndex w) + leftWindowCount
-    WindowColumn.Right -> case (wDirection w) of
+    Types.Right -> case (wDirection w) of
       Up -> getLastNthWindowIndex (wIndex w) windowCount
       Down -> getLastNthWindowIndex (wIndex w - (rightWindowCount)) windowCount
-    WindowColumn.Middle -> (wIndex w)
+    Types.Middle -> (wIndex w)
 
 
 mainSplit :: MiddleColumn a -> Rectangle -> [Rectangle]
