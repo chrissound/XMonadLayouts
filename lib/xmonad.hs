@@ -117,7 +117,6 @@ myStartupHook = do
   io $ grabKey dpy (myKeyCode) anyModifier rootw False grabModeAsync grabModeAsync
   spawn "~/ScriptsVcs/hideTint2.sh"
   addHiddenWorkspace "hidden"
-  -- XMonad.Actions.DynamicWorkspaces
 
 myHook :: Event -> X All
 myHook e = do
@@ -133,22 +132,9 @@ myHook e = do
     _ -> pure ()
   pure $ All True
 
--- myKeysWorkspace :: KeyMask -> [((KeyMask, KeySym), X ())]
--- myKeysWorkspace modm =
---   [
---     (
---       (m .|. modm, key)
---     , screenWorkspace sc >>= flip whenJust (windows . f)
---     ) | (key, sc) <- zip [xK_w, xK_e, xK_r] [0..]
---       , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]
---   ]
-
 myKeys :: XConfig l -> M.Map (KeyMask, KeySym) (X ())
 myKeys _undefined@XConfig {XMonad.modMask = modm} =
   M.fromList $
-  --   zip (zip (repeat (modm)) ([xK_1..xK_9] ++ [xK_0])) (map (withNthWorkspace W.greedyView) [0..])
-  -- ++
-  --   zip (zip (repeat (modm .|. shiftMask)) ([xK_1..xK_9] ++ [xK_0])) (map (withNthWorkspace W.shift) [0..])
   [
       ((modm, xK_0), pure ())
     , ((modm .|. shiftMask, xK_0), pure ())
@@ -160,11 +146,9 @@ myKeys _undefined@XConfig {XMonad.modMask = modm} =
   ++
             [
             -- Navigation
-              ((mod1Mask, xK_j), windowSwap D True >> windows W.focusDown)
-            , ((mod1Mask, xK_k), windowSwap U True >> windows W.focusUp)
+              ((mod1Mask, xK_j), windowSwap D True >> windowGo U True)
+            , ((mod1Mask, xK_k), windowSwap U True >> windowGo D True)
             , ((mod1Mask, xK_m), sendMessage MasterOverLayToggleFocus)
-            -- Misc
-            -- GridSelecet
             -- Toggle left / right column width 
             , ((modm, xK_semicolon), sendMessage (middleColumnModifyId {
                                                          modifySplitRatio = \x -> if x >= 0.25 then (0.25 - 1 * 0.04) else (0.25 + 2 * 0.04 )}))
@@ -339,26 +323,6 @@ devWorkspacePrompt = do
   x <- liftIO $ readProcess "rofi" ["-show fb -modi fb:~/Scripts/rofi/xmonadSpace.sh"] ""
   renameWorkspaceByName x
 
--- rearrangeWindows' :: (Int -> W.Stack Window -> W.Stack Window) -> X [Window] -> X ()
--- rearrangeWindows' f f' =
---   (\ws -> fmap (\w' -> elemIndex w' (W.integrate' ws)))
---     <$> (get >>= return . W.stack . W.workspace . W.current . windowset)
---     <*> (f')
---   >>= \case
---     (Just x:_) -> windows . W.modify' $ f x
---     _ -> pure ()
-
--- rearrangeWindows :: X ()
--- rearrangeWindows = do
---   rearrangeWindows' (swopStackElements 0) (findWindowsByClass "Emacs")
---   rearrangeWindows' (swopStackElements 2) (findWindowsInCurrentWorkspaceByTitle "ranger" )
---   rearrangeWindows' (swopStackElements 3) (findWindowsInCurrentWorkspaceByTitlePrefix "magit")
-
--- rearrangeWindows'' :: [Rectangle] -> X ()
--- rearrangeWindows'' r = do
---   rearrangeWindows' (swopStackElements 0) (findWindowsByClass "Emacs")
---   rearrangeWindows' (swopStackElements 2) (findWindowsInCurrentWorkspaceByTitle "ranger" )
---   rearrangeWindows' (swopStackElements 3) (findWindowsInCurrentWorkspaceByTitlePrefix "magit")
 
 tagWindomMappings :: [((KeyMask, KeySym), X ())]
 tagWindomMappings = [
@@ -396,6 +360,7 @@ specialKeyMappings =
         -- programs
         , ( xK_e, spawn "emacsclient -c")
         , ( xK_u, spawn "rofi -show fb -modi fb:/home/chris/chrishomeold/home/chris/Scripts/rofi/envs/recentfiles/rofi.sh")
+        -- , ( xK_i, spawn "gnome-terminal -e '/home/chris/ScriptsVcs/vimRangerLastPwd.sh'")
         , ( xK_i, spawn "gnome-terminal -e '/home/chris/ScriptsVcs/vimRangerLastPwd.sh'")
         , ( xK_v, spawn "gnome-terminal -e 'nvim +star'")
         , ( xK_r, rearrangeWindows'')
