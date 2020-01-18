@@ -22,25 +22,10 @@ import Data.List (sortBy)
 import Data.Maybe
 import Debug.Trace
 import WindowColumn
-  -- ( Column(Left, Middle, Right)
-  -- , SwopSideColumnWindow(..)
-  -- , SwopTo(SwopTo)
-  -- , wColumn
-  -- , wIndex
-  -- , wDirection
-  -- , WindowDirection (..)
-  -- , WindowPosition (..)
-  -- )
-
 import MyDebug
--- import WindowCoordinates
 import WindowFinder
 import Operations
 import Types
--- import RearrangeWindows
-
-traceTraceShowId :: Show a => String -> a -> a
-traceTraceShowId x = traceShow x . traceShowId
 
 
 masterColumnWindowCount :: MiddleColumn a -> Int
@@ -206,26 +191,23 @@ instance (Show a) => LayoutClass MiddleColumn a where
       resize Shrink = l & splitRatio .~ max 0 (sRatio - 0.04)
       incmastern (IncMasterN x) = l & middleColumnCount .~ max 0 (l ^. middleColumnCount + x)
   handleMessage l m = do
-    ws <- getWindowState >>= (return . W.stack . W.workspace . W.current)
+    ws <- getWindowState >>= pure . W.stack . W.workspace . W.current
+    sr <- getScreenRes
     let possibleMessages =
           [
             case (fromMessage m :: Maybe (FocusWindow' WindowPosition)) of
-              (Just (FocusWindow' wp)) ->
-                return $ do
-                  sr <- getScreenRes
+              Just (FocusWindow' wp) ->
+                return $ 
                   case ws of
                     Just ws' -> do
                       let r = snd <$> layoutRectangles l sr ws'
                       case windowPositionToStacksetIndex wp r of
-                        Just i -> do
-                          windows $ focusWindow $ traceTraceShowId "FocusWindow:" i
-                          return Nothing
+                        Just i -> windows (focusWindow i) >> pure Nothing
                         Nothing -> error "???"
                     Nothing -> pure Nothing
               _ -> Nothing
             ,case fromMessage m :: Maybe SwopWindow' of
               Just (SwopWindow' wp) -> return $ do
-                  sr <- getScreenRes
                   ws''' <- withWindowSet pure
                   case ws of
                     Just ws' -> do
@@ -241,8 +223,7 @@ instance (Show a) => LayoutClass MiddleColumn a where
                     Nothing -> pure Nothing
               _ -> Nothing
           , case fromMessage m :: Maybe SwopTo' of
-              Just (SwopTo' f t) -> return $ do
-                sr <- getScreenRes
+              Just (SwopTo' f t) -> pure $
                 case ws of
                   Just ws' -> do
                     let w = fst <$> layoutRectangles l sr ws'
